@@ -148,7 +148,7 @@ CPU, not from Groq. Their scores show what a 4B model does, not the targets:
 | Faithfulness (judge)         | mean 0.75 over 32; the 3B judge also marks correct answers as unfaithful                                                                 |
 
 With `qwen3:4b` as its own judge the mean is 1.00 on the same replies, which is why the judge is
-a different model family. Re-record with Groq once a key is available.
+a different model family. Re-record with Groq with the `eval-live` workflow (see CI).
 
 ## Getting started
 
@@ -198,9 +198,10 @@ No API keys are needed for the checks above. All settings are documented in `.en
 
 ## CI
 
-| Workflow | Trigger                       | Jobs                                                                                                     | Secrets |
-| -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
-| `ci.yml` | pull requests, push to `main` | `lint-typecheck`, `unit` (checksum, build:db, golden check, Vitest), `eval-replay`, `ollama-smoke` (CPU) | none    |
+| Workflow        | Trigger                       | Jobs                                                                                                     | Secrets                             |
+| --------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `ci.yml`        | pull requests, push to `main` | `lint-typecheck`, `unit` (checksum, build:db, golden check, Vitest), `eval-replay`, `ollama-smoke` (CPU) | none                                |
+| `eval-live.yml` | manual, Mondays 04:17 UTC     | `groq-record` (full golden set live on Groq, records replies)                                            | `GROQ_API_KEY` in environment `llm` |
 
 - `eval-replay` runs all 40 golden cases with the recorded replies and judge verdicts in a few
   seconds and fails on errors, replay misses or a score that differs from the baseline.
@@ -210,7 +211,25 @@ No API keys are needed for the checks above. All settings are documented in `.en
   22.8 s per question on average and 33.0 s at most, with 0 pipeline errors and about 4 minutes
   for the whole job; the 8 cases add about 3 minutes.
 
-Actions are pinned to commit SHAs and the workflow runs with `contents: read` only.
+### Live eval on Groq
+
+`eval-live.yml` runs all 40 golden cases against `openai/gpt-oss-120b` with `qwen/qwen3.8-27b` as
+judge, one call at a time through the free-plan limiter (429 and 5xx are retried with backoff).
+It writes the live metrics to the job summary, replays the new recordings against the scores they
+produced, and uploads the recordings, the proposed `baseline.json` and the raw results as the
+artifact `groq-live-recordings`. Nothing is committed by the workflow. Without the
+`GROQ_API_KEY` secret in the `llm` environment (forks) it skips with a notice and passes.
+
+```sh
+gh workflow run eval-live.yml --ref main
+run=$(gh run list --workflow eval-live.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch "$run"
+gh run download "$run" --name groq-live-recordings # in the repo root: overwrites evals/recordings/
+npm run eval:replay                                # same check as CI
+git add evals/recordings && git commit -m "test(evals): re-record golden replies on Groq"
+```
+
+Actions are pinned to commit SHAs and the workflows run with `contents: read` only.
 
 ## Roadmap
 
