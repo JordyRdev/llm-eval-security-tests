@@ -1,0 +1,5 @@
+# LLM09:2026 Vector and Embedding Weaknesses: not applicable. The app has no RAG, no vector
+# store and no embeddings, so there is nothing to test; the README says so too.
+owasp2026: LLM09
+note: Not applicable, the app uses no embeddings or vector store.
+cases: []
