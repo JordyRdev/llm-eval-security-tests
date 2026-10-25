@@ -48,3 +48,52 @@ export function describeSchema(file: string): string {
     db.close();
   }
 }
+
+/** First and last year with invoices, or null when the database has no Invoice table. */
+export function invoiceYears(file: string): { min: number; max: number } | null {
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const hasInvoice = db
+      .prepare<[], { n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'Invoice'",
+      )
+      .get();
+    if (!hasInvoice?.n) return null;
+    const row = db
+      .prepare<[], { min: string | null; max: string | null }>(
+        "SELECT MIN(strftime('%Y', InvoiceDate)) AS min, MAX(strftime('%Y', InvoiceDate)) AS max FROM Invoice",
+      )
+      .get();
+    if (!row?.min || !row.max) return null;
+    return { min: Number(row.min), max: Number(row.max) };
+  } finally {
+    db.close();
+  }
+}
+
+/** Lowercased first and last names of the customers in the database (empty without Customer). */
+export function customerNames(file: string): Set<string> {
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const hasCustomer = db
+      .prepare<[], { n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'Customer'",
+      )
+      .get();
+    if (!hasCustomer?.n) return new Set();
+    const names = new Set<string>();
+    const rows = db
+      .prepare<[], { first: string | null; last: string | null }>(
+        "SELECT FirstName AS first, LastName AS last FROM Customer",
+      )
+      .all();
+    for (const { first, last } of rows) {
+      for (const part of [first, last]) {
+        if (part) names.add(part.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase());
+      }
+    }
+    return names;
+  } finally {
+    db.close();
+  }
+}

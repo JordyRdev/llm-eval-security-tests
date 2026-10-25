@@ -6,7 +6,8 @@ import { sanitizeOutput } from "../guardrails/output.ts";
 import type { ChatMessage, LlmProvider } from "../llm/provider.ts";
 import { QueryRunner, type QueryResult } from "../sql/execute.ts";
 import { guardSql } from "../sql/guard.ts";
-import { describeSchema, listTables } from "../sql/schema.ts";
+import { customerNames, describeSchema, invoiceYears, listTables } from "../sql/schema.ts";
+import { emptyPeriodOutsideData, otherAgentMentioned, type YearRange } from "./scope.ts";
 import {
   AnswerStepSchema,
   SqlStepSchema,
@@ -36,6 +37,8 @@ interface Target {
   readonly runner: QueryRunner;
   readonly tables: string[];
   readonly schema: string;
+  readonly years: YearRange | null;
+  readonly customerNames: ReadonlySet<string>;
 }
 
 interface RunState {
@@ -105,6 +108,8 @@ export class ChatEngine {
         runner: new QueryRunner(file, this.queryTimeoutMs),
         tables: listTables(file),
         schema: describeSchema(file),
+        years: invoiceYears(file),
+        customerNames: customerNames(file),
       };
       this.targets.set(file, target);
     }
@@ -151,6 +156,10 @@ export class ChatEngine {
     }
 
     const target = this.target(role);
+    // Another agent's data is never in this role's database, so a query would only return 0.
+    if (this.mode === "hardened" && otherAgentMentioned(question, role, target.customerNames)) {
+      return refuse("outside your role");
+    }
     const messages: ChatMessage[] = [
       {
         role: "system",
@@ -199,6 +208,13 @@ export class ChatEngine {
     // it; that is decided here, without asking the model.
     const rows = trimRows(result);
     if (rows.every((row) => Object.values(row).every((v) => v === null))) {
+      return refuse("not in data", sql);
+    }
+    // A total of 0 for years without any invoices is missing data, not a real zero.
+    if (
+      this.mode === "hardened" &&
+      emptyPeriodOutsideData(question, sql ?? "", rows, target.years)
+    ) {
       return refuse("not in data", sql);
     }
     const answerMessages: ChatMessage[] = [

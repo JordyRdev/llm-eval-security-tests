@@ -60,7 +60,7 @@ describe("ChatEngine (hardened)", () => {
     const provider = new ScriptedProvider([
       JSON.stringify({ refused: true, reason: "That data is outside the user's role" }),
     ]);
-    const response = await engine(provider).ask("agent_steve", "What is Jane's revenue?");
+    const response = await engine(provider).ask("agent_steve", "What do the other agents earn?");
     expect(response).toMatchObject({
       refused: true,
       reason: "outside your role",
@@ -78,6 +78,72 @@ describe("ChatEngine (hardened)", () => {
     const response = await engine(provider).ask("agent_jane", "Revenue in 2020?");
     expect(response).toMatchObject({ refused: true, reason: "not in data", meta: { calls: 1 } });
     expect(response.sql).toContain("2020");
+  });
+
+  it("refuses questions about another agent's customers without calling the model", async () => {
+    for (const [role, question] of [
+      ["agent_steve", "How many invoices do Margaret's customers have?"],
+      ["agent_jane", "How many customers does Margaret support?"],
+      ["agent_margaret", "What is Steve Johnson's salary?"],
+      ["agent_steve", "What is Jane's total revenue?"],
+    ] as const) {
+      const provider = new ScriptedProvider([]);
+      const response = await engine(provider).ask(role, question);
+      expect(response, question).toMatchObject({
+        refused: true,
+        reason: "outside your role",
+        value: null,
+        sql: null,
+        rows_used: [],
+        meta: { calls: 0 },
+      });
+    }
+  });
+
+  it("still answers an agent about their own customers and the manager about agents", async () => {
+    const own = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      answer("You have 21 customers.", 21, "customers"),
+    ]);
+    const jane = await engine(own).ask("agent_jane", "How many customers do I have, Jane here?");
+    expect(jane).toMatchObject({ refused: false, value: 21 });
+
+    const manager = new ScriptedProvider([
+      sql("SELECT 'Jane Peacock' AS agent, 833.04 AS revenue"),
+      answer("Jane Peacock has the highest revenue.", "Jane Peacock"),
+    ]);
+    const response = await engine(manager).ask("sales_manager", "What is Margaret's revenue?");
+    expect(response).toMatchObject({ refused: false, meta: { calls: 2 } });
+  });
+
+  it("refuses a zero total for a year without invoices, without the answer call", async () => {
+    const provider = new ScriptedProvider([
+      sql(
+        "SELECT ROUND(COALESCE(SUM(Total), 0), 2) AS revenue FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2020'",
+      ),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "What was my revenue in 2020?");
+    expect(response).toMatchObject({
+      refused: true,
+      reason: "not in data",
+      value: null,
+      rows_used: [],
+      meta: { calls: 1 },
+    });
+  });
+
+  it("keeps a real zero inside the data range", async () => {
+    const provider = new ScriptedProvider([
+      sql(
+        "SELECT COUNT(*) AS invoices FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2011' AND BillingCountry = 'Atlantis'",
+      ),
+      answer("You had 0 invoices from Atlantis in 2011.", 0, "invoices"),
+    ]);
+    const response = await engine(provider).ask(
+      "agent_jane",
+      "How many invoices from Atlantis did I have in 2011?",
+    );
+    expect(response).toMatchObject({ refused: false, value: 0, meta: { calls: 2 } });
   });
 
   it("feeds a guard rejection back and retries once", async () => {
