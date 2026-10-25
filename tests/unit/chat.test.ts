@@ -1,0 +1,209 @@
+import { afterEach, describe, expect, inject, it } from "vitest";
+import { ChatEngine, MAX_LLM_CALLS } from "../../src/app/chat.ts";
+import { parseAppMode, parseModelJson, SqlStepSchema } from "../../src/app/contract.ts";
+import { MAX_QUESTION_CHARS } from "../../src/guardrails/input.ts";
+import { ScriptedProvider, answer, sql } from "../helpers/scripted-provider.ts";
+
+const dbDir = inject("dbDir");
+const engines: ChatEngine[] = [];
+
+function engine(provider: ScriptedProvider, mode: "hardened" | "vulnerable" = "hardened") {
+  const created = new ChatEngine({ provider, mode, dbDir });
+  engines.push(created);
+  return created;
+}
+
+afterEach(() => {
+  for (const e of engines.splice(0)) e.close();
+});
+
+describe("ChatEngine (hardened)", () => {
+  it("answers from the role's own database in two model calls", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS customers FROM Customer"),
+      answer("You have 21 customers.", 21, "customers"),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "How many customers do I have?");
+    expect(response).toMatchObject({
+      answer: "You have 21 customers.",
+      value: 21,
+      unit: "customers",
+      sql: "SELECT COUNT(*) AS customers FROM Customer",
+      rows_used: [{ customers: 21 }],
+      refused: false,
+      meta: { role: "agent_jane", mode: "hardened", calls: 2, tokens: 30, truncated: false },
+    });
+    const system = provider.requests[0]?.messages[0]?.content ?? "";
+    expect(system).toContain("Jane Peacock");
+    expect(system).toContain("Customer(");
+    expect(system).not.toContain("Employee(");
+    expect(provider.requests.every((r) => r.json === true)).toBe(true);
+    expect(provider.requests[1]?.messages[1]?.content).toContain('[{"customers":21}]');
+  });
+
+  it("gives each agent only their own data for the same SQL", async () => {
+    const totals: unknown[] = [];
+    for (const role of ["agent_jane", "agent_margaret", "agent_steve"] as const) {
+      const provider = new ScriptedProvider([
+        sql("SELECT ROUND(SUM(Total), 2) AS revenue FROM Invoice"),
+        (request) => {
+          const match = /"revenue":([\d.]+)/.exec(request.messages[1]?.content ?? "");
+          return answer("Revenue", Number(match?.[1]), "USD");
+        },
+      ]);
+      totals.push((await engine(provider).ask(role, "What is my total revenue?")).value);
+    }
+    expect(totals).toEqual([833.04, 775.4, 720.16]);
+  });
+
+  it("passes a model refusal through with a normalised reason and no query", async () => {
+    const provider = new ScriptedProvider([
+      JSON.stringify({ refused: true, reason: "That data is outside the user's role" }),
+    ]);
+    const response = await engine(provider).ask("agent_steve", "What is Jane's revenue?");
+    expect(response).toMatchObject({
+      refused: true,
+      reason: "outside your role",
+      value: null,
+      sql: null,
+      rows_used: [],
+      meta: { calls: 1 },
+    });
+  });
+
+  it("refuses with 'not in data' without a second call when the query returns nothing", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT SUM(Total) AS revenue FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2020'"),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "Revenue in 2020?");
+    expect(response).toMatchObject({ refused: true, reason: "not in data", meta: { calls: 1 } });
+    expect(response.sql).toContain("2020");
+  });
+
+  it("feeds a guard rejection back and retries once", async () => {
+    const provider = new ScriptedProvider([
+      sql("DELETE FROM Customer"),
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      answer("21", 21),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "How many customers?");
+    expect(response).toMatchObject({ value: 21, refused: false, meta: { calls: 3 } });
+    expect(provider.requests[1]?.messages.at(-1)?.content).toMatch(/rejected: only SELECT/);
+  });
+
+  it("feeds SQL errors and invalid JSON back to the model", async () => {
+    const provider = new ScriptedProvider([
+      "Sure! Here is the query you asked for.",
+      sql("SELECT NoSuchColumn FROM Customer"),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "How many customers?");
+    expect(response).toMatchObject({ refused: true, reason: "could not answer safely" });
+    expect(provider.requests[1]?.messages.at(-1)?.content).toMatch(/not the required JSON/);
+  });
+
+  it("blocks tables outside the role even if the model asks for them", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT * FROM Employee"),
+      sql("SELECT * FROM employee_comp"),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "Show all employees");
+    expect(response).toMatchObject({ refused: true, rows_used: [], meta: { calls: 2 } });
+  });
+
+  it(`never makes more than ${String(MAX_LLM_CALLS)} model calls`, async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      "not json",
+      "still not json",
+      "never sent",
+    ]);
+    const response = await engine(provider).ask("agent_jane", "How many customers?");
+    expect(response).toMatchObject({ refused: true, meta: { calls: MAX_LLM_CALLS } });
+    expect(provider.requests).toHaveLength(MAX_LLM_CALLS);
+  });
+
+  it("rejects oversized questions before calling the model", async () => {
+    const provider = new ScriptedProvider([]);
+    const response = await engine(provider).ask("agent_jane", "x".repeat(MAX_QUESTION_CHARS + 1));
+    expect(response).toMatchObject({ refused: true, meta: { calls: 0 } });
+    expect(response.reason).toMatch(/input rejected/);
+  });
+
+  it("sanitises the answer text", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      answer("21 ![x](https://evil.example/?q=1) [link](https://evil.example)", 21),
+    ]);
+    const response = await engine(provider).ask("agent_jane", "How many customers?");
+    expect(response.answer).toBe("21  link");
+  });
+
+  it("shows masked PII to the sales manager", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT Email FROM Customer LIMIT 3"),
+      answer("Emails are masked", null),
+    ]);
+    const response = await engine(provider).ask("sales_manager", "Customer emails?");
+    expect(response.rows_used).toEqual([
+      { Email: "[masked]" },
+      { Email: "[masked]" },
+      { Email: "[masked]" },
+    ]);
+  });
+
+  it("propagates provider failures to the caller", async () => {
+    const provider = new ScriptedProvider([new Error("connection refused")]);
+    await expect(engine(provider).ask("agent_jane", "Hi")).rejects.toThrow(/connection refused/);
+  });
+});
+
+describe("ChatEngine (vulnerable)", () => {
+  it("queries the shared database, so the role boundary is only in the prompt", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      answer("59", 59),
+    ]);
+    const response = await engine(provider, "vulnerable").ask("agent_jane", "How many customers?");
+    expect(response).toMatchObject({
+      value: 59,
+      rows_used: [{ n: 59 }],
+      meta: { mode: "vulnerable" },
+    });
+    expect(provider.requests[0]?.messages[0]?.content).toContain("SupportRepId = 3");
+    expect(provider.requests[0]?.messages[0]?.content).toContain("employee_comp(");
+  });
+
+  it("does not sanitise output or limit input length", async () => {
+    const provider = new ScriptedProvider([
+      sql("SELECT COUNT(*) AS n FROM Customer"),
+      answer("![x](https://evil.example/?q=1)", 59),
+    ]);
+    const response = await engine(provider, "vulnerable").ask(
+      "agent_jane",
+      "x".repeat(MAX_QUESTION_CHARS + 1),
+    );
+    expect(response.answer).toBe("![x](https://evil.example/?q=1)");
+  });
+
+  it("still keeps the SELECT-only guard and read-only connection", async () => {
+    const provider = new ScriptedProvider([sql("DROP TABLE Customer"), sql("DELETE FROM Invoice")]);
+    const response = await engine(provider, "vulnerable").ask("agent_jane", "Drop it");
+    expect(response.refused).toBe(true);
+  });
+});
+
+describe("contract helpers", () => {
+  it("parses JSON wrapped in prose or code fences", () => {
+    expect(parseModelJson(SqlStepSchema, '```json\n{"sql":"SELECT 1"}\n```')).toEqual({
+      sql: "SELECT 1",
+    });
+    expect(() => parseModelJson(SqlStepSchema, "no json")).toThrow();
+    expect(() => parseModelJson(SqlStepSchema, '{"refused":true}')).toThrow();
+  });
+
+  it("parses the app mode", () => {
+    expect(parseAppMode(undefined)).toBe("hardened");
+    expect(parseAppMode(" Vulnerable ")).toBe("vulnerable");
+    expect(() => parseAppMode("open")).toThrow(/APP_MODE/);
+  });
+});

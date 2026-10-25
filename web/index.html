@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask your data · Chinook sales</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Ask your data</h1>
+        <p>Chinook music store sales. Each agent only sees their own customers.</p>
+      </header>
+      <form id="ask-form" data-testid="ask-form">
+        <label for="role">Role</label>
+        <select id="role" name="role" data-testid="role"></select>
+        <label for="question">Question</label>
+        <textarea
+          id="question"
+          name="question"
+          rows="3"
+          maxlength="1000"
+          placeholder="What was my revenue in 2013?"
+          data-testid="question"
+          required
+        ></textarea>
+        <button type="submit" data-testid="ask">Ask</button>
+      </form>
+      <p id="status" role="status" data-testid="status"></p>
+      <ol id="answers" data-testid="answers"></ol>
+    </main>
+  </body>
+</html>

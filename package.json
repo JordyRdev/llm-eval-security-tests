@@ -12,11 +12,13 @@
   "scripts": {
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:data": "tsx scripts/verify-dataset.ts",
     "build:db": "tsx scripts/build-db.ts",
+    "start": "tsx --env-file-if-exists=.env src/app/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/app/server.ts",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {
@@ -33,8 +35,12 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.5",
     "better-sqlite3": "^13.0.3",
+    "esbuild": "^0.28.2",
+    "hono": "^4.13.14",
     "node-sql-parser": "^5.4.0",
-    "openai": "^7.43.0"
+    "openai": "^7.43.0",
+    "zod": "^4.6.7"
   }
 }
