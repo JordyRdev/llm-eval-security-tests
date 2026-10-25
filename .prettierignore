@@ -1,0 +1,6 @@
+node_modules/
+out/
+site/
+coverage/
+data/
+package-lock.json
