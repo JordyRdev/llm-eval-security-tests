@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
-    "node-sql-parser": "^5.4.0"
+    "node-sql-parser": "^5.4.0",
+    "openai": "^7.43.0"
   }
 }
