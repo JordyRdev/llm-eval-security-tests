@@ -19,6 +19,7 @@
     "build:db": "tsx scripts/build-db.ts",
     "start": "tsx --env-file-if-exists=.env src/app/server.ts",
     "dev": "tsx watch --env-file-if-exists=.env src/app/server.ts",
+    "smoke": "tsx --env-file-if-exists=.env scripts/smoke.ts",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {

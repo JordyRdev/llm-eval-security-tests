@@ -47,3 +47,52 @@ jobs:
       - name: Build role databases
         run: npm run build:db
       - run: npm test
+
+  # Runs the real pipeline against a local open model, without any secret. Measures the speed
+  # on a hosted runner; fails only when the pipeline breaks, not on answer accuracy.
+  ollama-smoke:
+    name: ollama-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LLM_PROVIDER: ollama
+      OLLAMA_MODEL: qwen3:4b
+      OLLAMA_MODELS: /home/runner/.ollama/models
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama || true
+          ollama --version
+      - name: Cache model
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /home/runner/.ollama/models
+          key: ollama-${{ env.OLLAMA_MODEL }}-v1
+      - name: Start Ollama and pull the model
+        run: |
+          mkdir -p "$OLLAMA_MODELS"
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version && break; sleep 1; done
+          ollama pull "$OLLAMA_MODEL"
+      - name: Load the model into memory
+        run: |
+          start=$(date +%s%N)
+          curl -fsS http://127.0.0.1:11434/api/generate \
+            -d "{\"model\":\"$OLLAMA_MODEL\",\"prompt\":\"\",\"keep_alive\":\"30m\"}" > /dev/null
+          echo "Model load took $(( ($(date +%s%N) - start) / 1000000 )) ms" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Build role databases
+        run: npm run build:db
+      - name: Smoke run
+        run: npm run smoke -- out/smoke.json
+      - name: Ollama log
+        if: failure()
+        run: tail -n 100 "$RUNNER_TEMP/ollama.log"
