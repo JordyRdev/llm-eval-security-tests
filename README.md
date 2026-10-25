@@ -148,6 +148,10 @@ No API keys are needed for the checks above. All settings are documented in `.en
 answers and timings to the job summary. It fails only when the pipeline breaks, not on
 accuracy; accuracy is gated by the evals in Phase 2.
 
+Measured on the first green run (25 Oct 2026): `qwen3:4b` on the hosted runner took 22.8 s per
+question on average and 33.0 s at most, with 0 pipeline errors and about 4 minutes for the
+whole run.
+
 Actions are pinned to commit SHAs and the workflow runs with `contents: read` only.
 
 ## Roadmap
