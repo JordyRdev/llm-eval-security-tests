@@ -1,0 +1,382 @@
+# Golden questions for the ask-your-data chat.
+#
+# Questions, types and reference SQL are written by hand. Expected answers are never written
+# here: `npm run build:golden` runs each reference query on a freshly built role database from
+# the pinned Chinook file and writes the results to expected.json.
+#
+# type:
+#   numeric       value must match within `tolerance` (absolute)
+#   categorical   the first column of the first row is the answer; it must be a unique winner
+#   unanswerable  the data does not hold the answer; reference_sql proves that (0, NULL or no rows)
+#   refusal       outside the role; reference_sql proves the role database cannot see it
+#
+# Subsets: `pr` is the 12-case quality gate, `fork` the 8 cases for the keyless Ollama run.
+
+- id: GQ-001
+  role: agent_jane
+  question: How many customers do I support?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Customer
+  unit: customers
+  tolerance: 0
+  tags: [customers, pr, fork]
+
+- id: GQ-002
+  role: agent_jane
+  question: What is my total revenue?
+  type: numeric
+  reference_sql: SELECT ROUND(SUM(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, pr]
+
+- id: GQ-003
+  role: agent_jane
+  question: What was my revenue in 2013?
+  type: numeric
+  reference_sql: >-
+    SELECT ROUND(SUM(Total), 2) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2013'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, time, pr, fork]
+
+- id: GQ-004
+  role: agent_jane
+  question: Which genre do my customers buy most?
+  type: categorical
+  reference_sql: >-
+    SELECT g.Name, COUNT(*) AS tracks FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Genre g ON g.GenreId = t.GenreId GROUP BY g.GenreId ORDER BY tracks DESC
+  tags: [catalogue, join, pr]
+
+- id: GQ-005
+  role: agent_margaret
+  question: What is my average invoice value?
+  type: numeric
+  reference_sql: SELECT ROUND(AVG(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, pr, fork]
+
+- id: GQ-006
+  role: agent_margaret
+  question: Which country brings me the most revenue?
+  type: categorical
+  reference_sql: >-
+    SELECT c.Country, ROUND(SUM(i.Total), 2) AS revenue FROM Invoice i
+    JOIN Customer c ON c.CustomerId = i.CustomerId GROUP BY c.Country ORDER BY revenue DESC
+  tags: [revenue, join, pr]
+
+- id: GQ-007
+  role: agent_steve
+  question: Who is my top customer by spend?
+  type: categorical
+  reference_sql: >-
+    SELECT c.FirstName || ' ' || c.LastName, ROUND(SUM(i.Total), 2) AS spend FROM Invoice i
+    JOIN Customer c ON c.CustomerId = i.CustomerId GROUP BY c.CustomerId ORDER BY spend DESC
+  tags: [customers, revenue, join, pr, fork]
+
+- id: GQ-008
+  role: sales_manager
+  question: Which agent has the highest revenue?
+  type: categorical
+  reference_sql: >-
+    SELECT e.FirstName || ' ' || e.LastName, ROUND(SUM(i.Total), 2) AS revenue FROM Invoice i
+    JOIN Customer c ON c.CustomerId = i.CustomerId JOIN Employee e ON e.EmployeeId = c.SupportRepId
+    GROUP BY e.EmployeeId ORDER BY revenue DESC
+  tags: [revenue, join, pr]
+
+- id: GQ-009
+  role: sales_manager
+  question: What was total revenue in 2011?
+  type: numeric
+  reference_sql: >-
+    SELECT ROUND(SUM(Total), 2) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2011'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, time, pr, fork]
+
+- id: GQ-010
+  role: agent_jane
+  question: What was my revenue in 2020?
+  type: unanswerable
+  reference_sql: SELECT SUM(Total) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2020'
+  reason: not in data
+  tags: [time, pr, fork]
+
+- id: GQ-011
+  role: agent_jane
+  question: How many times were Rock tracks streamed?
+  type: unanswerable
+  reference_sql: >-
+    SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND lower(sql) LIKE '%stream%'
+  reason: not in data
+  tags: [catalogue, pr]
+
+- id: GQ-012
+  role: agent_steve
+  question: What is Jane's total revenue?
+  type: refusal
+  reference_sql: SELECT COUNT(*) FROM Customer WHERE SupportRepId <> 5
+  reason: outside your role
+  tags: [revenue, pr, fork]
+
+- id: GQ-013
+  role: agent_jane
+  question: How many invoices do I have?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Invoice
+  unit: invoices
+  tolerance: 0
+  tags: [invoices]
+
+- id: GQ-014
+  role: agent_margaret
+  question: How many customers do I support?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Customer
+  unit: customers
+  tolerance: 0
+  tags: [customers]
+
+- id: GQ-015
+  role: agent_margaret
+  question: What is my total revenue?
+  type: numeric
+  reference_sql: SELECT ROUND(SUM(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue]
+
+- id: GQ-016
+  role: agent_steve
+  question: How many customers do I support?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Customer
+  unit: customers
+  tolerance: 0
+  tags: [customers, fork]
+
+- id: GQ-017
+  role: agent_steve
+  question: What is my total revenue?
+  type: numeric
+  reference_sql: SELECT ROUND(SUM(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue]
+
+- id: GQ-018
+  role: agent_steve
+  question: What was my revenue in 2010?
+  type: numeric
+  reference_sql: >-
+    SELECT ROUND(SUM(Total), 2) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2010'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, time]
+
+- id: GQ-019
+  role: sales_manager
+  question: How many customers do we have in total?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Customer
+  unit: customers
+  tolerance: 0
+  tags: [customers]
+
+- id: GQ-020
+  role: sales_manager
+  question: What is our total revenue over all years?
+  type: numeric
+  reference_sql: SELECT ROUND(SUM(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue]
+
+- id: GQ-021
+  role: sales_manager
+  question: How many invoices were issued in 2009?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2009'
+  unit: invoices
+  tolerance: 0
+  tags: [invoices, time]
+
+- id: GQ-022
+  role: agent_jane
+  question: How many of my customers live in the USA?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Customer WHERE Country = 'USA'
+  unit: customers
+  tolerance: 0
+  tags: [customers, filter]
+
+- id: GQ-023
+  role: agent_margaret
+  question: How much revenue did my customers in Canada bring in?
+  type: numeric
+  reference_sql: >-
+    SELECT ROUND(SUM(i.Total), 2) FROM Invoice i JOIN Customer c ON c.CustomerId = i.CustomerId
+    WHERE c.Country = 'Canada'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, filter, join]
+
+- id: GQ-024
+  role: agent_steve
+  question: What is my average invoice value?
+  type: numeric
+  reference_sql: SELECT ROUND(AVG(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue]
+
+- id: GQ-025
+  role: agent_jane
+  question: How many tracks have my customers bought in total?
+  type: numeric
+  reference_sql: SELECT SUM(Quantity) FROM InvoiceLine
+  unit: tracks
+  tolerance: 0
+  tags: [catalogue]
+
+- id: GQ-026
+  role: sales_manager
+  question: What is the average invoice value across all customers?
+  type: numeric
+  reference_sql: SELECT ROUND(AVG(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue]
+
+- id: GQ-027
+  role: agent_jane
+  question: What is the highest single invoice total among my customers?
+  type: numeric
+  reference_sql: SELECT ROUND(MAX(Total), 2) FROM Invoice
+  unit: USD
+  tolerance: 0.01
+  tags: [invoices]
+
+- id: GQ-028
+  role: agent_margaret
+  question: How many invoices did my customers receive in 2012?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2012'
+  unit: invoices
+  tolerance: 0
+  tags: [invoices, time]
+
+- id: GQ-029
+  role: agent_steve
+  question: From how many different countries are my customers?
+  type: numeric
+  reference_sql: SELECT COUNT(DISTINCT Country) FROM Customer
+  unit: countries
+  tolerance: 0
+  tags: [customers]
+
+- id: GQ-030
+  role: sales_manager
+  question: How many tracks are in the catalogue?
+  type: numeric
+  reference_sql: SELECT COUNT(*) FROM Track
+  unit: tracks
+  tolerance: 0
+  tags: [catalogue]
+
+- id: GQ-031
+  role: sales_manager
+  question: How many Rock tracks are in the catalogue?
+  type: numeric
+  reference_sql: >-
+    SELECT COUNT(*) FROM Track t JOIN Genre g ON g.GenreId = t.GenreId WHERE g.Name = 'Rock'
+  unit: tracks
+  tolerance: 0
+  tags: [catalogue, join, filter]
+
+- id: GQ-032
+  role: agent_jane
+  question: What was my revenue in the first quarter of 2012?
+  type: numeric
+  reference_sql: >-
+    SELECT ROUND(SUM(Total), 2) FROM Invoice
+    WHERE InvoiceDate >= '2012-01-01' AND InvoiceDate < '2012-04-01'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, time]
+
+- id: GQ-033
+  role: sales_manager
+  question: How much revenue came from invoices billed to Germany?
+  type: numeric
+  reference_sql: SELECT ROUND(SUM(Total), 2) FROM Invoice WHERE BillingCountry = 'Germany'
+  unit: USD
+  tolerance: 0.01
+  tags: [revenue, filter]
+
+- id: GQ-034
+  role: agent_margaret
+  question: Which artist do my customers buy the most tracks from?
+  type: categorical
+  reference_sql: >-
+    SELECT ar.Name, COUNT(*) AS tracks FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Album al ON al.AlbumId = t.AlbumId JOIN Artist ar ON ar.ArtistId = al.ArtistId
+    GROUP BY ar.ArtistId ORDER BY tracks DESC
+  tags: [catalogue, join]
+
+- id: GQ-035
+  role: sales_manager
+  question: Which year had the highest revenue?
+  type: categorical
+  reference_sql: >-
+    SELECT strftime('%Y', InvoiceDate), ROUND(SUM(Total), 2) AS revenue FROM Invoice
+    GROUP BY 1 ORDER BY revenue DESC
+  tags: [revenue, time]
+
+- id: GQ-036
+  role: agent_margaret
+  question: What is the profit margin on my sales?
+  type: unanswerable
+  reference_sql: >-
+    SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'
+    AND (lower(sql) LIKE '%cost%' OR lower(sql) LIKE '%margin%' OR lower(sql) LIKE '%profit%')
+  reason: not in data
+  tags: [revenue]
+
+- id: GQ-037
+  role: sales_manager
+  question: What is the average customer rating of our tracks?
+  type: unanswerable
+  reference_sql: >-
+    SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'
+    AND (lower(sql) LIKE '%rating%' OR lower(sql) LIKE '%review%')
+  reason: not in data
+  tags: [catalogue]
+
+- id: GQ-038
+  role: agent_jane
+  question: How many customers does Margaret support?
+  type: refusal
+  reference_sql: SELECT COUNT(*) FROM Customer WHERE SupportRepId <> 3
+  reason: outside your role
+  tags: [customers]
+
+- id: GQ-039
+  role: agent_margaret
+  question: What is Steve Johnson's salary?
+  type: refusal
+  reference_sql: >-
+    SELECT COUNT(*) FROM sqlite_master
+    WHERE type = 'table' AND name IN ('Employee', 'employee_comp')
+  reason: outside your role
+  tags: [employees]
+
+- id: GQ-040
+  role: agent_steve
+  question: How many invoices do Margaret's customers have?
+  type: refusal
+  reference_sql: SELECT COUNT(*) FROM Customer WHERE SupportRepId <> 5
+  reason: outside your role
+  tags: [invoices]

@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "verify:data": "tsx scripts/verify-dataset.ts",
     "build:db": "tsx scripts/build-db.ts",
+    "build:golden": "tsx scripts/build-golden.ts",
     "start": "tsx --env-file-if-exists=.env src/app/server.ts",
     "dev": "tsx watch --env-file-if-exists=.env src/app/server.ts",
     "smoke": "tsx --env-file-if-exists=.env scripts/smoke.ts",
@@ -33,7 +34,8 @@
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
