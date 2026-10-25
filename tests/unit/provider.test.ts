@@ -4,8 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { TokenBudget, type BudgetClock } from "../../src/llm/budget.ts";
 import {
+  JsonGenerationError,
   OpenAICompatibleProvider,
   createProvider,
+  extractJsonObject,
+  isJsonGenerationError,
   resolveProviderName,
   stripThinking,
   type CompletionRequest,
@@ -19,7 +22,11 @@ import {
 } from "../../src/llm/replay.ts";
 
 type Params = Record<string, unknown>;
-type Step = { content: string } | { error: { status: number; headers?: Record<string, string> } };
+type Step =
+  | { content: string }
+  | {
+      error: { status: number; code?: string; message?: string; headers?: Record<string, string> };
+    };
 
 function fakeClient(steps: Step[]): {
   client: NonNullable<OpenAICompatibleOptions["client"]>;
@@ -168,6 +175,120 @@ describe("OpenAICompatibleProvider", () => {
     const { instance } = provider([{ content: '<think>\nhmm\n</think>\n{"sql":"SELECT 1"}' }]);
     expect((await instance.complete(request)).content).toBe('{"sql":"SELECT 1"}');
     expect(stripThinking("<THINK>a</THINK> b <think>c</think>")).toBe("b");
+  });
+});
+
+const jsonFailed: Step = {
+  error: {
+    status: 400,
+    code: "json_validate_failed",
+    message: "400 Failed to generate JSON. Please adjust your prompt.",
+  },
+};
+
+describe("invalid JSON from the API in JSON mode", () => {
+  let dir: string | undefined;
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  it("recognises Groq's json_validate_failed by code or message, and only as a 400", () => {
+    expect(isJsonGenerationError({ status: 400, code: "json_validate_failed" })).toBe(true);
+    expect(isJsonGenerationError({ status: 400, message: "Failed to generate JSON." })).toBe(true);
+    expect(isJsonGenerationError({ status: 400, message: "bad request" })).toBe(false);
+    expect(isJsonGenerationError({ status: 500, code: "json_validate_failed" })).toBe(false);
+    expect(isJsonGenerationError(new Error("Failed to generate JSON"))).toBe(false);
+    expect(isJsonGenerationError(undefined)).toBe(false);
+  });
+
+  it("retries once in JSON mode and returns that reply", async () => {
+    const { instance, calls, clock } = provider([jsonFailed, { content: '{"sql":"SELECT 1"}' }]);
+    expect((await instance.complete(request)).content).toBe('{"sql":"SELECT 1"}');
+    expect(calls).toHaveLength(2);
+    expect(calls.map((c) => c["response_format"])).toEqual([
+      { type: "json_object" },
+      { type: "json_object" },
+    ]);
+    expect(clock.slept).toEqual([]);
+  });
+
+  it("then tries once without JSON mode and keeps only the extracted JSON object", async () => {
+    const { instance, calls } = provider([
+      jsonFailed,
+      jsonFailed,
+      { content: 'Here you go:\n```json\n{"sql":"SELECT 1"}\n```' },
+    ]);
+    expect((await instance.complete(request)).content).toBe('{"sql":"SELECT 1"}');
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).not.toHaveProperty("response_format");
+    expect(calls[2]).toMatchObject({ messages: calls[0]?.["messages"] });
+  });
+
+  it("gives up after at most two extra attempts", async () => {
+    const plainNotJson = provider([
+      jsonFailed,
+      jsonFailed,
+      { content: "SELECT 1" },
+      { content: "{}" },
+    ]);
+    const error: unknown = await plainNotJson.instance.complete(request).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonGenerationError);
+    expect((error as Error).cause).toMatchObject({ code: "json_validate_failed" });
+    expect(plainNotJson.calls).toHaveLength(3);
+
+    const noFallback = provider([jsonFailed, jsonFailed, { content: "{}" }], {
+      plainJsonFallback: false,
+    });
+    await expect(noFallback.instance.complete(request)).rejects.toMatchObject({
+      code: "json_validate_failed",
+    });
+    expect(noFallback.calls).toHaveLength(2);
+
+    const noRetry = provider([jsonFailed, { content: "{}" }], {
+      jsonRetries: 0,
+      plainJsonFallback: false,
+    });
+    await expect(noRetry.instance.complete(request)).rejects.toMatchObject({ status: 400 });
+    expect(noRetry.calls).toHaveLength(1);
+  });
+
+  it("does not use the JSON retries for requests without JSON mode", async () => {
+    const { instance, calls } = provider([jsonFailed, { content: "never" }]);
+    await expect(instance.complete({ messages: request.messages })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("charges every attempt to the budget", async () => {
+    const budget = new TokenBudget({ rpd: 10, tpd: 10_000 }, fakeClock());
+    const { instance } = provider([jsonFailed, jsonFailed, { content: '{"a":1}' }], { budget });
+    await instance.complete(request);
+    const usage = budget.usage();
+    expect(usage.dayRequests).toBe(3);
+    // Failed attempts keep their estimate (prompt plus maxTokens); the last one its real usage.
+    expect(usage.dayTokens).toBeGreaterThan(2 * 100 + 10);
+  });
+
+  it("records only the final reply, under the original request's key", async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "replay-"));
+    const file = path.join(dir, "app.json");
+    const { instance } = provider([jsonFailed, jsonFailed, { content: 'ok {"sql":"SELECT 1"}' }]);
+    const recorder = new RecordingProvider(instance, file);
+    await recorder.complete(request);
+    await recorder.save();
+    const saved = JSON.parse(await readFile(file, "utf8")) as Record<string, { content: string }>;
+    expect(Object.keys(saved)).toEqual([recordingKey(request)]);
+    const replay = await ReplayProvider.fromFile(file);
+    expect((await replay.complete(request)).content).toBe('{"sql":"SELECT 1"}');
+  });
+
+  it("extracts only a JSON object", () => {
+    expect(extractJsonObject('x {"a":{"b":1}} y')).toBe('{"a":{"b":1}}');
+    expect(extractJsonObject("[1,2]")).toBeUndefined();
+    expect(extractJsonObject("{not json}")).toBeUndefined();
+    expect(extractJsonObject("no braces")).toBeUndefined();
   });
 });
 

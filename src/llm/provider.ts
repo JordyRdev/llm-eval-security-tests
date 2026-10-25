@@ -57,6 +57,16 @@ export interface OpenAICompatibleOptions {
   readonly budget?: TokenBudget;
   readonly reasoningEffort?: "none" | "low" | "medium" | "high";
   readonly maxRetries?: number;
+  /**
+   * Extra JSON-mode attempts after the API rejects its own output as invalid JSON (Groq's 400
+   * `json_validate_failed`). Default 1.
+   */
+  readonly jsonRetries?: number;
+  /**
+   * After the JSON-mode attempts, try once more without JSON mode and keep the reply only if a
+   * JSON object can be pulled out of it. Default true.
+   */
+  readonly plainJsonFallback?: boolean;
   readonly timeoutMs?: number;
   readonly clock?: BudgetClock;
   /** Injected for tests; defaults to a real OpenAI client. */
@@ -65,7 +75,47 @@ export interface OpenAICompatibleOptions {
 
 interface RetryableError {
   status?: number;
+  code?: string | null;
+  message?: string;
   headers?: Headers | Record<string, string>;
+}
+
+/**
+ * True for a 400 where the API itself failed to produce valid JSON in JSON mode (Groq returns
+ * `code: "json_validate_failed"` with "Failed to generate JSON"). The request is fine; the
+ * sampled output was not, so another attempt can succeed.
+ */
+export function isJsonGenerationError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { status, code, message } = error as RetryableError;
+  if (status !== 400) return false;
+  return code === "json_validate_failed" || /failed to generate json/i.test(message ?? "");
+}
+
+export class JsonGenerationError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "JsonGenerationError";
+  }
+}
+
+/**
+ * Lenient JSON extraction for replies without JSON mode: drops a code fence or surrounding
+ * text, and returns the outermost object only if it parses. Returns undefined otherwise.
+ */
+export function extractJsonObject(text: string): string | undefined {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) return undefined;
+  const candidate = text.slice(start, end + 1);
+  try {
+    const value: unknown = JSON.parse(candidate);
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function retryAfterMs(error: RetryableError): number | undefined {
@@ -78,6 +128,8 @@ function retryAfterMs(error: RetryableError): number | undefined {
 /**
  * One client for every OpenAI-compatible endpoint (Groq, Ollama's `/v1`). Calls run one at a
  * time, go through the token budget, and are retried with exponential backoff on 429 and 5xx.
+ * A JSON-mode request that the API rejects as invalid JSON gets a bounded number of extra
+ * attempts (see `jsonRetries` and `plainJsonFallback`); every attempt goes through the budget.
  */
 export class OpenAICompatibleProvider implements LlmProvider {
   readonly name: OpenAICompatibleOptions["name"];
@@ -101,9 +153,33 @@ export class OpenAICompatibleProvider implements LlmProvider {
   }
 
   complete(request: CompletionRequest): Promise<CompletionResult> {
-    const result = this.queue.then(() => this.completeWithRetry(request));
+    const result = this.queue.then(() => this.completeJsonSafe(request));
     this.queue = result.catch(() => undefined);
     return result;
+  }
+
+  private async completeJsonSafe(request: CompletionRequest): Promise<CompletionResult> {
+    if (!request.json) return this.completeWithRetry(request);
+    const jsonRetries = this.options.jsonRetries ?? 1;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= jsonRetries; attempt++) {
+      try {
+        return await this.completeWithRetry(request);
+      } catch (error) {
+        if (!isJsonGenerationError(error)) throw error;
+        lastError = error;
+      }
+    }
+    if (this.options.plainJsonFallback === false) throw lastError;
+    const result = await this.completeWithRetry({ ...request, json: false });
+    const json = extractJsonObject(result.content);
+    if (json === undefined) {
+      throw new JsonGenerationError(
+        `no valid JSON after ${String(jsonRetries + 1)} JSON-mode attempt(s) and one without JSON mode`,
+        { cause: lastError },
+      );
+    }
+    return { ...result, content: json };
   }
 
   private async completeWithRetry(request: CompletionRequest): Promise<CompletionResult> {

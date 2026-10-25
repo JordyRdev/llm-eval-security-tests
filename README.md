@@ -113,7 +113,11 @@ All providers use the OpenAI-compatible chat API with temperature 0 and JSON mod
 | `replay`       | recorded replies (`evals/…`) | Deterministic, no network; used by `eval-replay` in CI      |
 
 The Groq limiter keeps requests within 30 RPM, 8K TPM, 1K RPD and 200K TPD, runs one request at
-a time and retries 429 and 5xx responses with backoff.
+a time and retries 429 and 5xx responses with backoff. When Groq rejects its own JSON-mode
+output (400 `json_validate_failed`, "Failed to generate JSON"), the call gets at most two extra
+attempts: one more in JSON mode, then one without JSON mode whose reply is kept only if a valid
+JSON object can be extracted from it. Every attempt counts against the limiter, and only the
+final reply is recorded, under the key of the original request, so replay stays deterministic.
 
 ## Evals
 
@@ -329,7 +333,7 @@ vulnerable database) and `canaries.json` (three canary customers and the prompt 
 
 `eval-live.yml` runs all 40 golden cases against `openai/gpt-oss-120b` with `qwen/qwen3.8-27b` as
 judge, then the security suite in both modes against `openai/gpt-oss-120b` (no judge), one call
-at a time through the free-plan limiter (429 and 5xx are retried with backoff). Together that is
+at a time through the free-plan limiter (429 and 5xx are retried with backoff, invalid JSON at most twice). Together that is
 about 200 app calls and 120k tokens, inside the free plan's 1,000 requests and 200k tokens per
 day. It writes the live metrics and the security table to the job summary, replays the new
 recordings against the results they produced, and uploads the recordings
