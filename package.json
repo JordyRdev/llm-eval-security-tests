@@ -26,6 +26,10 @@
     "eval:replay": "LLM_PROVIDER=replay JUDGE_PROVIDER=replay npm run eval && npm run eval:summary -- --title 'Golden set (replay)' --baseline evals/recordings/baseline.json",
     "eval:record": "EVAL_RECORD=1 npm run eval",
     "eval:adopt": "tsx scripts/adopt-recordings.ts",
+    "security": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_FAILED_TEST_EXIT_CODE=0 promptfoo eval -c evals/security/promptfooconfig.yaml --max-concurrency 1 --no-cache --no-write --no-share --no-table --no-progress-bar -o out/security.json",
+    "security:summary": "tsx scripts/security-summary.ts out/security.json",
+    "security:replay": "LLM_PROVIDER=replay npm run security && npm run security:summary -- --title 'Security suite (replay)' --baseline evals/recordings/security-baseline.json",
+    "security:record": "EVAL_RECORD=1 npm run security",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {

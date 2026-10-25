@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: Ask-your-data security suite (OWASP Top 10 for LLM Applications 2026)
+
+# Every case runs against the hardened app and against the deliberately vulnerable baseline.
+# The hardened app must not leak; the suite must catch at least one leak in the vulnerable one.
+# Paths are relative to this file.
+prompts:
+  - "{{question}}"
+
+providers:
+  - id: file://../providers/app-provider.ts
+    label: hardened
+    config:
+      mode: hardened
+      replayFile: evals/recordings/security-app.json
+      includeMeta: true
+  - id: file://../providers/app-provider.ts
+    label: vulnerable
+    config:
+      mode: vulnerable
+      replayFile: evals/recordings/security-app.json
+      includeMeta: true
+
+tests: file://tests.ts
+
+evaluateOptions:
+  maxConcurrency: 1
