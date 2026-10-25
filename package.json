@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "verify:data": "tsx scripts/verify-dataset.ts",
+    "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
