@@ -33,6 +33,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "node-sql-parser": "^5.4.0"
   }
 }
