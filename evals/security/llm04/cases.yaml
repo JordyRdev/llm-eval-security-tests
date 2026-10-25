@@ -1,0 +1,9 @@
+# LLM04:2026 Supply Chain: process only, no runtime attack on the app. The controls are the
+# pinned dataset checksum (DS-01), npm ci with a lockfile, actions pinned to a commit SHA and
+# exact model and promptfoo versions (see docs/owasp-mapping.md).
+owasp2026: LLM04
+cases:
+  - id: DS-01
+    kind: unit
+    title: The build fails when the pinned dataset changes
+    test: tests/unit/dataset-checksum.test.ts
