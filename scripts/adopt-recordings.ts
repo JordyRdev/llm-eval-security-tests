@@ -1,7 +1,7 @@
 /**
  * Adopts the recordings of an eval-live run as the committed replay set.
  *
- *   tsx scripts/adopt-recordings.ts <artifact dir> [--run <run id>] [--repo owner/name]
+ *   tsx scripts/adopt-recordings.ts <artifact dir> [--run <run id>] [--suite all|golden|security]
  *
  * Copies app.json and judge.json (golden set) and, when present, security-app.json (security
  * suite) from the downloaded artifact into evals/recordings/. It then replays both suites with
@@ -9,6 +9,10 @@
  * always match the current scorers and checks) and rewrites the recorded-scores and
  * security-scores blocks in README.md. Exits 1 when a replayed case errors, such as a missing
  * recording.
+ *
+ * `--suite golden` or `--suite security` adopts one suite and leaves the other suite's
+ * recordings, baseline and README block untouched, for a run that recorded only one suite or
+ * where only one suite finished without errors.
  *
  * Passing evals/recordings itself re-derives the baselines and the README blocks from the
  * committed recordings, for example after recording locally with Ollama.
@@ -38,12 +42,23 @@ const { values, positionals } = parseArgs({
       default: process.env["GITHUB_REPOSITORY"] ?? "JordyRdev/llm-eval-security-tests",
     },
     readme: { type: "string", default: "README.md" },
+    suite: { type: "string", default: "all" },
   },
 });
 
+const suite = values.suite;
+if (suite !== "all" && suite !== "golden" && suite !== "security") {
+  console.error(`Unknown --suite "${suite}". Use all, golden or security.`);
+  process.exit(2);
+}
+const withGolden = suite !== "security";
+const withSecurity = suite !== "golden";
+
 const dir = positionals[0];
 if (!dir) {
-  console.error("Usage: tsx scripts/adopt-recordings.ts <artifact dir> [--run <run id>]");
+  console.error(
+    "Usage: tsx scripts/adopt-recordings.ts <artifact dir> [--run <run id>] [--suite <suite>]",
+  );
   process.exit(2);
 }
 
@@ -53,9 +68,10 @@ const candidates = [
   path.join(dir, "groq-live-recordings", RECORDINGS),
   dir,
 ];
-const source = candidates.find((c) => existsSync(path.join(c, "app.json")));
+const marker = withGolden ? "app.json" : "security-app.json";
+const source = candidates.find((c) => existsSync(path.join(c, marker)));
 if (!source) {
-  console.error(`No app.json found in ${candidates.join(", ")}`);
+  console.error(`No ${marker} found in ${candidates.join(", ")}`);
   process.exit(2);
 }
 
@@ -70,9 +86,14 @@ async function adopt(file: string): Promise<boolean> {
   return true;
 }
 
-await adopt("app.json");
-await adopt("judge.json");
-const hasSecurity = await adopt("security-app.json");
+if (withGolden) {
+  await adopt("app.json");
+  if (!(await adopt("judge.json"))) {
+    console.error(`No judge.json next to app.json in ${source}; nothing adopted.`);
+    process.exit(2);
+  }
+}
+const hasSecurity = withSecurity && (await adopt("security-app.json"));
 
 function replay(script: string, env: Record<string, string>): void {
   const run = spawnSync("npm", ["run", script], {
@@ -107,22 +128,24 @@ const origin = values.run
     ? "a local recording run"
     : "an eval-live run";
 
+const blocks: Record<string, string[]> = {};
+
 // Golden set.
-replay("eval", { LLM_PROVIDER: "replay", JUDGE_PROVIDER: "replay", EVAL_SUBSET: "full" });
-const results = parseResults(JSON.parse(await readFile("out/results.json", "utf8")));
-const summary = buildSummary(results, "full");
-if (summary.errors > 0 || results.length === 0) {
-  console.error(`${String(summary.errors)} replayed case(s) errored; recordings not adopted.`);
-  process.exit(1);
-}
-await writeFile(
-  path.join(RECORDINGS, "baseline.json"),
-  `${JSON.stringify(scoreTable(results), null, 2)}\n`,
-);
-const app = await modelsIn(path.join(RECORDINGS, "app.json"));
-const judge = await modelsIn(path.join(RECORDINGS, "judge.json"));
-const blocks: Record<string, string[]> = {
-  "recorded-scores": [
+if (withGolden) {
+  replay("eval", { LLM_PROVIDER: "replay", JUDGE_PROVIDER: "replay", EVAL_SUBSET: "full" });
+  const results = parseResults(JSON.parse(await readFile("out/results.json", "utf8")));
+  const summary = buildSummary(results, "full");
+  if (summary.errors > 0 || results.length === 0) {
+    console.error(`${String(summary.errors)} replayed case(s) errored; recordings not adopted.`);
+    process.exit(1);
+  }
+  await writeFile(
+    path.join(RECORDINGS, "baseline.json"),
+    `${JSON.stringify(scoreTable(results), null, 2)}\n`,
+  );
+  const app = await modelsIn(path.join(RECORDINGS, "app.json"));
+  const judge = await modelsIn(path.join(RECORDINGS, "judge.json"));
+  blocks["recorded-scores"] = [
     `The committed recordings come from ${app.provider} (app \`${app.models}\`, judge \`${judge.models}\`),`,
     `${origin}, adopted on ${date}. Replayed with the current app and scorers:`,
     "",
@@ -132,8 +155,10 @@ const blocks: Record<string, string[]> = {
       (m) =>
         `| ${m.metric} | ${m.display} | ${m.target} | ${m.met === null ? "—" : m.met ? "yes" : "no"} |`,
     ),
-  ],
-};
+  ];
+} else {
+  console.log("--suite security: golden recordings unchanged.");
+}
 
 // Security suite.
 if (hasSecurity) {
@@ -157,8 +182,10 @@ if (hasSecurity) {
     "",
     ...securityTables(securitySummary),
   ];
-} else {
+} else if (withSecurity) {
   console.log("No security-app.json in the artifact; security recordings unchanged.");
+} else {
+  console.log("--suite golden: security recordings unchanged.");
 }
 
 let readme = await readFile(values.readme, "utf8");
