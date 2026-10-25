@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: Ask-your-data golden set (accuracy, made-up content, refusals)
+
+# Paths are relative to this file. The question goes to the app as is; the role comes from
+# the test vars.
+prompts:
+  - "{{question}}"
+
+providers:
+  - id: file://providers/app-provider.ts
+    label: ask-your-data
+
+tests: file://golden/tests.ts
+
+evaluateOptions:
+  maxConcurrency: 1

@@ -21,6 +21,9 @@
     "start": "tsx --env-file-if-exists=.env src/app/server.ts",
     "dev": "tsx watch --env-file-if-exists=.env src/app/server.ts",
     "smoke": "tsx --env-file-if-exists=.env scripts/smoke.ts",
+    "eval": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_FAILED_TEST_EXIT_CODE=0 promptfoo eval -c evals/promptfooconfig.yaml --max-concurrency 1 --no-cache --no-write --no-share --no-table --no-progress-bar -o out/results.json",
+    "eval:summary": "tsx scripts/eval-summary.ts out/results.json",
+    "eval:record": "EVAL_RECORD=1 npm run eval",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {
@@ -31,6 +34,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
+    "promptfoo": "0.125.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
