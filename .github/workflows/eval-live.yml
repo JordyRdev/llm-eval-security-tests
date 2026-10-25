@@ -3,9 +3,17 @@ name: eval-live
 # Records the full golden set (40 cases) and the security suite (every case against the hardened
 # app and the vulnerable baseline) against the real Groq models and proposes new replay
 # recordings and baselines as an artifact. Nothing is committed from here: download the
-# artifact, review it and commit it yourself.
+# artifact, review it and commit it yourself. Started by hand, `suite` can limit the run to one
+# suite (golden about 70k tokens, security about 60k), for example to re-record only the suite
+# that failed; adopt it with `npm run eval:adopt -- <dir> --suite <suite>`.
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Which suites to record
+        type: choice
+        options: [all, golden, security]
+        default: all
   schedule:
     # Mondays 04:17 UTC. Golden set: about 120 app calls (about 50k tokens) and 32 judge calls.
     # Security suite: about 80 app calls (about 70k tokens), no judge. Inside the Groq free
@@ -34,6 +42,8 @@ jobs:
       JUDGE_MODEL: qwen/qwen3.8-27b
       EVAL_SUBSET: full
       EVAL_JUDGE: "1"
+      # Scheduled runs have no inputs and record both suites.
+      SUITE: ${{ inputs.suite || 'all' }}
     steps:
       - name: Check for the Groq key
         id: key
@@ -66,7 +76,7 @@ jobs:
 
       # Start from empty files so the artifact holds only replies from this run.
       - name: Record the golden set live (Groq)
-        if: steps.key.outputs.present == 'true'
+        if: steps.key.outputs.present == 'true' && env.SUITE != 'security'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
@@ -75,7 +85,7 @@ jobs:
           cp out/results.json out/results-live.json
 
       - name: Live summary
-        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' && env.SUITE != 'security' }}
         run: >-
           npx tsx scripts/eval-summary.ts out/results-live.json
           --title "Golden set (Groq live: $GROQ_MODEL, judge $JUDGE_MODEL)"
@@ -84,12 +94,12 @@ jobs:
 
       # Same check as eval-replay in ci.yml: the new recordings must reproduce every live score.
       - name: Replay the new recordings against the proposed baseline
-        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' && env.SUITE != 'security' }}
         run: npm run eval:replay
 
       - name: Record the security suite live (Groq)
         id: security
-        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' && env.SUITE != 'golden' }}
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SECURITY_SUBSET: full
@@ -110,6 +120,16 @@ jobs:
       - name: Replay the new security recordings against the proposed baseline
         if: ${{ !cancelled() && steps.security.outcome == 'success' }}
         run: npm run security:replay
+
+      # The checkout holds the committed recordings; keep only what this run recorded.
+      - name: Leave the suite that was not recorded out of the artifact
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' && env.SUITE != 'all' }}
+        run: |
+          if [ "$SUITE" = golden ]; then
+            rm -f evals/recordings/security-app.json evals/recordings/security-baseline.json
+          else
+            rm -f evals/recordings/app.json evals/recordings/judge.json evals/recordings/baseline.json
+          fi
 
       - name: Make sure the key is not in the artifact
         if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}

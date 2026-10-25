@@ -333,15 +333,26 @@ vulnerable database) and `canaries.json` (three canary customers and the prompt 
 
 `eval-live.yml` runs all 40 golden cases against `openai/gpt-oss-120b` with `qwen/qwen3.8-27b` as
 judge, then the security suite in both modes against `openai/gpt-oss-120b` (no judge), one call
-at a time through the free-plan limiter (429 and 5xx are retried with backoff, invalid JSON at most twice). Together that is
-about 200 app calls and 120k tokens, inside the free plan's 1,000 requests and 200k tokens per
-day. It writes the live metrics and the security table to the job summary, replays the new
-recordings against the results they produced, and uploads the recordings
-(`app.json`, `judge.json`, `security-app.json`), the proposed baselines and the raw results as the
-artifact `groq-live-recordings`. Nothing is committed by the workflow. Download it with `-D`
+at a time through the free-plan limiter (429 and 5xx are retried with backoff, invalid JSON at
+most twice). Together that is about 200 app calls and 120k tokens, inside the free plan's 1,000
+requests and 200k tokens per model per day. It writes the live metrics and the security table to
+the job summary, replays the new recordings against the results they produced, and uploads the
+recordings (`app.json`, `judge.json`, `security-app.json`), the proposed baselines and the raw
+results as the artifact `groq-live-recordings`. Nothing is committed by the workflow. Download it with `-D`
 into a separate directory: `gh` 2.63.1 refuses a single `--name` artifact extracted into the
 current directory ("would result in path traversal", fixed in 2.63.2). Without the
 `GROQ_API_KEY` secret in the `llm` environment (forks) it skips with a notice and passes.
+
+Started by hand, the `suite` input (`all`, `golden` or `security`) records one suite only, for
+example to re-record the suite that had an error without spending the tokens of the other one.
+Adopt such a run with `--suite`, which leaves the other suite's recordings, baseline and README
+block as they are:
+
+```sh
+gh workflow run eval-live.yml --ref main -f suite=golden
+# ... watch and download as below, then:
+npm run eval:adopt -- out/groq-live --run "$run" --suite golden
+```
 
 ```sh
 gh workflow run eval-live.yml --ref main
