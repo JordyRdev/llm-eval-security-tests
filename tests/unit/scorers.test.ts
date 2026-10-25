@@ -117,6 +117,126 @@ describe("accuracy", () => {
     expect(scoreAccuracy(out({ value: 2010 }), year).pass).toBe(true);
   });
 
+  describe("categorical answers whose value is the winning metric", () => {
+    const genre: ScoreCase = {
+      type: "categorical",
+      question: "Which genre do my customers buy most?",
+      expected: {
+        value: "Rock",
+        unit: null,
+        tolerance: null,
+        margin: { winner_score: 304, runner_up: "Latin", runner_up_score: 139 },
+      },
+    };
+    const country: ScoreCase = {
+      type: "categorical",
+      question: "Which country brings me the most revenue?",
+      expected: {
+        value: "USA",
+        unit: null,
+        tolerance: null,
+        margin: { winner_score: 239.72, runner_up: "Portugal", runner_up_score: 77.24 },
+      },
+    };
+    const agent: ScoreCase = {
+      type: "categorical",
+      question: "Which agent has the highest revenue?",
+      expected: {
+        value: "Jane Peacock",
+        unit: null,
+        tolerance: null,
+        margin: { winner_score: 833.04, runner_up: "Margaret Park", runner_up_score: 775.4 },
+      },
+    };
+
+    it("passes the label from the answer when it is in rows_used (genre, country, agent)", () => {
+      const rock = out({
+        answer: "Your customers buy the most Rock genre, generating $300.96 in revenue.",
+        value: 300.96,
+        unit: "USD",
+        rows_used: [{ genre: "Rock", revenue: 300.96 }],
+      });
+      const usa = out({
+        answer: "USA generates the highest revenue of $239.72.",
+        value: 239.72,
+        unit: "USD",
+        rows_used: [{ country: "USA", revenue: 239.72 }],
+      });
+      const jane = out({
+        answer: "Jane Peacock has the highest revenue of 833.04 USD.",
+        value: 833.04,
+        unit: "USD",
+        rows_used: [{ EmployeeId: 3, AgentName: "Jane Peacock", Revenue: 833.04 }],
+      });
+      expect(scoreAccuracy(rock, genre).pass).toBe(true);
+      expect(scoreAccuracy(usa, country).pass).toBe(true);
+      expect(scoreAccuracy(jane, agent).pass).toBe(true);
+    });
+
+    it("joins name columns of a row and ignores case and accents", () => {
+      const result = out({
+        answer: "your top customer is HELENA HOLY.",
+        value: 49.62,
+        rows_used: [{ FirstName: "Helena", LastName: "Holý", spend: 49.62 }],
+      });
+      expect(scoreAccuracy(result, categorical).pass).toBe(true);
+    });
+
+    it("fails a wrong label in the answer", () => {
+      const latin = out({
+        answer: "Your customers buy the most Latin tracks ($139.00).",
+        value: 139,
+        rows_used: [{ genre: "Latin", revenue: 139 }],
+      });
+      expect(scoreAccuracy(latin, genre).pass).toBe(false);
+    });
+
+    it("fails a label that is not in rows_used", () => {
+      const result = out({
+        answer: "Rock is the top genre with $300.96.",
+        value: 300.96,
+        rows_used: [{ revenue: 300.96 }],
+      });
+      expect(scoreAccuracy(result, genre).reason).toMatch(/rows_used does not contain/);
+    });
+
+    it("fails an answer that also names the runner-up", () => {
+      const result = out({
+        answer: "Rock or Latin, both around $300.",
+        value: 300.96,
+        rows_used: [
+          { genre: "Rock", revenue: 300.96 },
+          { genre: "Latin", revenue: 139 },
+        ],
+      });
+      expect(scoreAccuracy(result, genre).reason).toMatch(/runner-up/);
+    });
+
+    it("fails a wrong name in value even when the answer names the label", () => {
+      const result = out({
+        answer: "Rock is the top genre.",
+        value: "Latin",
+        rows_used: [{ genre: "Rock", revenue: 300.96 }],
+      });
+      expect(scoreAccuracy(result, genre).pass).toBe(false);
+    });
+
+    it("does not accept a longer label or part of a word", () => {
+      const rockAndRoll = out({
+        answer: "Your top genre is Rock And Roll.",
+        value: 12,
+        rows_used: [{ genre: "Rock And Roll", revenue: 12 }],
+      });
+      expect(scoreAccuracy(rockAndRoll, genre).pass).toBe(false);
+      const ausa = out({
+        answer: "AUSA brings the most.",
+        value: 1,
+        rows_used: [{ country: "AUSA" }],
+      });
+      expect(scoreAccuracy(ausa, country).pass).toBe(false);
+    });
+  });
+
   it("scores unanswerable questions on refusing without a value", () => {
     expect(scoreAccuracy(out({ refused: true, reason: "not in data" }), unanswerable).pass).toBe(
       true,
