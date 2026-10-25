@@ -27,8 +27,9 @@ describe("sanitizeOutput", () => {
     ).toBe("Total 5  see docs");
   });
 
-  it("strips invisible characters but keeps HTML as text", () => {
-    expect(sanitizeOutput("a\u200Bb <img src=x>")).toBe("ab <img src=x>");
+  it("strips invisible characters and HTML tags", () => {
+    expect(sanitizeOutput("a\u200Bb <img src=x onerror=alert(1)> <b>c</b>")).toBe("ab  c");
+    expect(sanitizeOutput("revenue < 5 and > 2")).toBe("revenue < 5 and > 2");
   });
 });
 

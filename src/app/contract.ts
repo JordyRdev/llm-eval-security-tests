@@ -44,6 +44,8 @@ export interface AskResponse {
     readonly tokens: number;
     readonly latencyMs: number;
     readonly truncated: boolean;
+    /** Result cells the hardened app withheld from the answer step as likely injection. */
+    readonly withheld: number;
   };
 }
 

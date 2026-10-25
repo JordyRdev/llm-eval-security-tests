@@ -1,8 +1,15 @@
 import { readFileSync } from "node:fs";
-import { ROLE_DEFINITIONS, type Role } from "../auth/roles.ts";
+import { ROLE_DEFINITIONS, ROLES, type Role } from "../auth/roles.ts";
+import { loadCanaries } from "../data/canaries.ts";
 import { roleDbPath, vulnerableDbPath, DEFAULT_BUILD_DIR } from "../db/paths.ts";
+import { withholdInjectedCells } from "../guardrails/injection.ts";
 import { checkInput } from "../guardrails/input.ts";
 import { sanitizeOutput } from "../guardrails/output.ts";
+import {
+  findPromptLeak,
+  promptShingles,
+  type PromptFingerprint,
+} from "../guardrails/prompt-leak.ts";
 import type { ChatMessage, LlmProvider } from "../llm/provider.ts";
 import { QueryRunner, type QueryResult } from "../sql/execute.ts";
 import { guardSql } from "../sql/guard.ts";
@@ -25,6 +32,23 @@ const MAX_CELL_CHARS = 300;
 
 const SYSTEM_TEMPLATE = readFileSync(new URL("./prompts/system.md", import.meta.url), "utf8");
 const ANSWER_TEMPLATE = readFileSync(new URL("./prompts/answer.md", import.meta.url), "utf8");
+/** Marker in both prompts; seeing it in an answer proves a system-prompt leak (LLM08). */
+export const PROMPT_CANARY = loadCanaries().systemPrompt;
+
+let fingerprint: PromptFingerprint | undefined;
+
+/** The canary plus every 8-word run of the prompts and role contexts, for leak detection. */
+export function promptFingerprint(): PromptFingerprint {
+  fingerprint ??= {
+    canary: PROMPT_CANARY,
+    shingles: promptShingles([
+      SYSTEM_TEMPLATE,
+      ANSWER_TEMPLATE,
+      ...ROLES.flatMap((role) => [roleContext(role, "hardened"), roleContext(role, "vulnerable")]),
+    ]),
+  };
+  return fingerprint;
+}
 
 export interface ChatEngineOptions {
   readonly provider: LlmProvider;
@@ -120,25 +144,26 @@ export class ChatEngine {
     const started = performance.now();
     const state: RunState = { calls: 0, tokens: 0 };
     let truncated = false;
+    let withheld = 0;
 
-    const respond = (
-      body: Omit<AskResponse, "meta" | "answer"> & { answer: string },
-    ): AskResponse => ({
-      ...body,
-      answer: this.mode === "hardened" ? sanitizeOutput(body.answer) : body.answer,
-      meta: {
-        role,
-        mode: this.mode,
-        provider: this.provider.name,
-        model: this.provider.model,
-        calls: state.calls,
-        tokens: state.tokens,
-        latencyMs: Math.round(performance.now() - started),
-        truncated,
-      },
+    const meta = () => ({
+      role,
+      mode: this.mode,
+      provider: this.provider.name,
+      model: this.provider.model,
+      calls: state.calls,
+      tokens: state.tokens,
+      latencyMs: Math.round(performance.now() - started),
+      truncated,
+      withheld,
     });
-    const refuse = (reason: string, sql: string | null = null): AskResponse =>
-      respond({
+    const refuse = (modelReason: string, sql: string | null = null): AskResponse => {
+      // The model's own refusal reason is shown to the user, so it passes the output guard too.
+      const reason =
+        this.mode === "hardened" && findPromptLeak(modelReason, promptFingerprint()) !== null
+          ? "could not answer safely"
+          : modelReason;
+      return {
         answer: refusalText(reason),
         value: null,
         unit: null,
@@ -146,7 +171,18 @@ export class ChatEngine {
         rows_used: [],
         refused: true,
         reason,
-      });
+        meta: meta(),
+      };
+    };
+    const respond = (body: Omit<AskResponse, "meta">): AskResponse => {
+      if (this.mode !== "hardened") return { ...body, meta: meta() };
+      const answer = sanitizeOutput(body.answer);
+      // Output guard: never let the prompt (or its canary) out, whatever the model wrote.
+      if (findPromptLeak(`${answer} ${String(body.value)}`, promptFingerprint()) !== null) {
+        return refuse("could not answer safely", body.sql);
+      }
+      return { ...body, answer, meta: meta() };
+    };
 
     let question = rawQuestion;
     if (this.mode === "hardened") {
@@ -165,6 +201,7 @@ export class ChatEngine {
         role: "system",
         content: fill(SYSTEM_TEMPLATE, {
           role_context: roleContext(role, this.mode),
+          canary: PROMPT_CANARY,
           schema: target.schema,
         }),
       },
@@ -206,7 +243,7 @@ export class ChatEngine {
 
     // Step 2: answer from the rows only. No rows (or only NULLs) means the data does not have
     // it; that is decided here, without asking the model.
-    const rows = trimRows(result);
+    let rows = trimRows(result);
     if (rows.every((row) => Object.values(row).every((v) => v === null))) {
       return refuse("not in data", sql);
     }
@@ -217,10 +254,16 @@ export class ChatEngine {
     ) {
       return refuse("not in data", sql);
     }
+    // Indirect injection: text in the rows (such as customer notes) that reads like an
+    // instruction or contains markup never reaches the answer step.
+    if (this.mode === "hardened") ({ rows, withheld } = withholdInjectedCells(rows));
     const answerMessages: ChatMessage[] = [
       {
         role: "system",
-        content: fill(ANSWER_TEMPLATE, { role_name: ROLE_DEFINITIONS[role].displayName }),
+        content: fill(ANSWER_TEMPLATE, {
+          role_name: ROLE_DEFINITIONS[role].displayName,
+          canary: PROMPT_CANARY,
+        }),
       },
       {
         role: "user",
