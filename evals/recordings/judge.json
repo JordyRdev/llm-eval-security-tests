@@ -1,0 +1,290 @@
+{
+  "0f538643aaa283727bff6bf45ac44396": {
+    "content": "{\"reason\": \"The answer is faithful to the SQL result in rows_used\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 392,
+      "completionTokens": 28,
+      "totalTokens": 420
+    }
+  },
+  "17e46cd20a1121921e47cae1c47366dc": {
+    "content": "{\"reason\": \"The answer states the number of customers and the unit 'customers', which is supported by rows_used.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 383,
+      "completionTokens": 36,
+      "totalTokens": 419
+    }
+  },
+  "1dfda9606f7fadfd35adf2ce2b3ef7b7": {
+    "content": "{\"reason\": \"The answer states the year with the highest revenue was 2010, which is supported by the rows.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 416,
+      "completionTokens": 37,
+      "totalTokens": 453
+    }
+  },
+  "2500797e769ba93a13b644f72e6fcba0": {
+    "content": "{\"reason\": \"The answer does not answer the question\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 447,
+      "completionTokens": 24,
+      "totalTokens": 471
+    }
+  },
+  "294b8e097c1a10d4b01657fa3189f635": {
+    "content": "{\"reason\": \"The answer is mostly faithful to the SQL result, but adds a currency symbol.\", \"pass\": true, \"score\": 0.5}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 400,
+      "completionTokens": 34,
+      "totalTokens": 434
+    }
+  },
+  "324da5c85459dfe5488d69a7be41757e": {
+    "content": "{\"reason\": \"The answer states the number of customers supported, which is supported by the rows.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 373,
+      "completionTokens": 32,
+      "totalTokens": 405
+    }
+  },
+  "3635dc90e6c914e08baa5dbaf8e901d0": {
+    "content": "{\"reason\": \"The answer states the number of customers supported, which is supported by the rows.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 376,
+      "completionTokens": 32,
+      "totalTokens": 408
+    }
+  },
+  "3c7bae3153515f2b3397762afc10ebe6": {
+    "content": "{\"reason\": \"The answer states a total revenue, which is supported by the rows\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 392,
+      "completionTokens": 30,
+      "totalTokens": 422
+    }
+  },
+  "485b744c373b084e3024ff5a99f775fb": {
+    "content": "{\"reason\": \"The answer accurately states the average invoice value and its unit.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 396,
+      "completionTokens": 28,
+      "totalTokens": 424
+    }
+  },
+  "4fc8562e5d7a99a9cbe7b47c285a5e81": {
+    "content": "{\"reason\": \"The answer does not state the agent, but rather the employee with the highest revenue.\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 437,
+      "completionTokens": 33,
+      "totalTokens": 470
+    }
+  },
+  "55c85dd77316c486d209bb70b49900b6": {
+    "content": "{\"reason\": \"The answer is faithful to the SQL result in rows_used\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 401,
+      "completionTokens": 28,
+      "totalTokens": 429
+    }
+  },
+  "5d17c5fbc68c1bf4fbb22b42826f3977": {
+    "content": "{\"reason\": \"The answer states the number of tracks correctly, but adds a period at the end.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 381,
+      "completionTokens": 33,
+      "totalTokens": 414
+    }
+  },
+  "60c389539691a2060ddb5d6720606830": {
+    "content": "{\"reason\": \"The answer is mostly faithful to the SQL result, but adds a currency symbol.\", \"pass\": true, \"score\": 0.5}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 419,
+      "completionTokens": 34,
+      "totalTokens": 453
+    }
+  },
+  "6d67228d669936baec57bdf228edf7c5": {
+    "content": "{\"reason\": \"The answer states the total number of tracks bought, which is supported by the rows\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 389,
+      "completionTokens": 33,
+      "totalTokens": 422
+    }
+  },
+  "75eb31d3fc55b07bccff03951f117672": {
+    "content": "{\"reason\": \"The answer accurately states Helena Holý as the top customer by spend with $49.62.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 436,
+      "completionTokens": 35,
+      "totalTokens": 471
+    }
+  },
+  "7be5c0239f269e68726c5436e0037a4c": {
+    "content": "{\"reason\": \"The answer accurately states the average invoice value and its unit.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 396,
+      "completionTokens": 28,
+      "totalTokens": 424
+    }
+  },
+  "7d44b00c7e86f6090e9f4717243886ca": {
+    "content": "{\"reason\": \"The answer states the number of Rock tracks, which is supported by rows_used.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 398,
+      "completionTokens": 32,
+      "totalTokens": 430
+    }
+  },
+  "9860c5adaf5efed25f89afb49b907ff8": {
+    "content": "{\"reason\": \"The answer states the number of countries correctly, but adds a unit.\", \"pass\": true, \"score\": 0.5}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 388,
+      "completionTokens": 32,
+      "totalTokens": 420
+    }
+  },
+  "9bc0b0ae4662a19950ae7c1b20b92f80": {
+    "content": "{\"reason\": \"The answer states the highest single invoice total among customers is $21.86, which is supported by the rows.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 397,
+      "completionTokens": 39,
+      "totalTokens": 436
+    }
+  },
+  "ad816028905f4a3b51d02300875ac165": {
+    "content": "{\"reason\": \"The answer states the number of invoices and the unit correctly, but adds a period at the end.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 401,
+      "completionTokens": 36,
+      "totalTokens": 437
+    }
+  },
+  "afaa8667dfae4e74e0ab49c604029d0c": {
+    "content": "{\"reason\": \"The answer states the year asked about, which is not in the rows.\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 414,
+      "completionTokens": 31,
+      "totalTokens": 445
+    }
+  },
+  "b1405b131d9e02b9f73e4000d4704009": {
+    "content": "{\"reason\": \"The answer is mostly faithful to the SQL result, but adds a currency and restates the question.\", \"pass\": true, \"score\": 0.5}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 434,
+      "completionTokens": 38,
+      "totalTokens": 472
+    }
+  },
+  "ca9e9a6c705223cb6476800f7a2ff2b8": {
+    "content": "{\"reason\": \"The answer states the number of customers, which is supported by the rows, but adds a period at the end.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 373,
+      "completionTokens": 39,
+      "totalTokens": 412
+    }
+  },
+  "d09e0180487ad22109a50b2c7807d3af": {
+    "content": "{\"reason\": \"The answer is faithful to the SQL result in rows_used.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 432,
+      "completionTokens": 28,
+      "totalTokens": 460
+    }
+  },
+  "e753f2cf864eff7c029e3c785be9e594": {
+    "content": "{\"reason\": \"The answer states a fact about the genre, but does not mention the total revenue.\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 455,
+      "completionTokens": 33,
+      "totalTokens": 488
+    }
+  },
+  "e85b997b18d3132498528406c515b899": {
+    "content": "{\"reason\": \"The answer accurately states the revenue generated by customers in Canada.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 414,
+      "completionTokens": 28,
+      "totalTokens": 442
+    }
+  },
+  "eb35e978d2563f2754774c8583419179": {
+    "content": "{\"reason\": \"The answer does not contain the country information the user asked for.\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 428,
+      "completionTokens": 29,
+      "totalTokens": 457
+    }
+  },
+  "ee1d17262292e47ebf000ea8ac2aaf7c": {
+    "content": "{\"reason\": \"The answer states the total number of customers, which is supported by the rows\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 382,
+      "completionTokens": 32,
+      "totalTokens": 414
+    }
+  },
+  "f2b1bc3a6d7f3d47885ef64919716a37": {
+    "content": "{\"reason\": \"The answer states the number of invoices and the unit, which is supported by rows_used.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 397,
+      "completionTokens": 34,
+      "totalTokens": 431
+    }
+  },
+  "f8cb1db2e45cdc42fdef397c01fc383d": {
+    "content": "{\"reason\": \"The answer states the year asked about, which is not in the rows.\", \"pass\": false, \"score\": 0}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 414,
+      "completionTokens": 31,
+      "totalTokens": 445
+    }
+  },
+  "f9c3eab0bf46a826aa96d19e708891b7": {
+    "content": "{\"reason\": \"The answer states the number of invoices correctly and restates the question.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 373,
+      "completionTokens": 30,
+      "totalTokens": 403
+    }
+  },
+  "fd50f90a5c92797f9a5169c330109324": {
+    "content": "{\"reason\": \"The answer is faithful to the SQL result in rows_used.\", \"pass\": true, \"score\": 1}",
+    "model": "llama3.2:3b",
+    "usage": {
+      "promptTokens": 392,
+      "completionTokens": 28,
+      "totalTokens": 420
+    }
+  }
+}

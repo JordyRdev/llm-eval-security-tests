@@ -23,6 +23,7 @@
     "smoke": "tsx --env-file-if-exists=.env scripts/smoke.ts",
     "eval": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_FAILED_TEST_EXIT_CODE=0 promptfoo eval -c evals/promptfooconfig.yaml --max-concurrency 1 --no-cache --no-write --no-share --no-table --no-progress-bar -o out/results.json",
     "eval:summary": "tsx scripts/eval-summary.ts out/results.json",
+    "eval:replay": "LLM_PROVIDER=replay JUDGE_PROVIDER=replay npm run eval && npm run eval:summary -- --title 'Golden set (replay)' --baseline evals/recordings/baseline.json",
     "eval:record": "EVAL_RECORD=1 npm run eval",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
