@@ -16,10 +16,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:data": "tsx scripts/verify-dataset.ts",
+    "build:db": "tsx scripts/build-db.ts",
     "check": "npm run lint && npm run typecheck && npm run verify:data && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.19.2",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
@@ -29,5 +31,8 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
   }
 }
