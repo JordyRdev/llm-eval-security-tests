@@ -1,0 +1,111 @@
+name: eval-live
+
+# Records the full golden set (40 cases) against the real Groq models and proposes new replay
+# recordings and a baseline as an artifact. Nothing is committed from here: download the
+# artifact, review it and commit it yourself.
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 04:17 UTC. About 160 calls and 100k tokens over two models, well inside the
+    # Groq free plan (1,000 requests and 200k tokens per model per day).
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-live
+  cancel-in-progress: false
+
+jobs:
+  groq-record:
+    name: groq-record
+    # Scheduled runs only in this repository; forks can still start it by hand and skip.
+    if: github.event_name != 'schedule' || github.repository == 'JordyRdev/llm-eval-security-tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: llm
+    env:
+      LLM_PROVIDER: groq
+      GROQ_MODEL: openai/gpt-oss-120b
+      JUDGE_PROVIDER: groq
+      JUDGE_MODEL: qwen/qwen3.8-27b
+      EVAL_SUBSET: full
+      EVAL_JUDGE: "1"
+    steps:
+      - name: Check for the Groq key
+        id: key
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -n "$GROQ_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            msg="No GROQ_API_KEY secret in the llm environment, so the live eval was skipped. Forks use eval-replay and ollama-smoke in ci.yml instead."
+            echo "::notice title=eval-live skipped::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        if: steps.key.outputs.present == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - if: steps.key.outputs.present == 'true'
+        run: npm ci
+      - name: Build role databases
+        if: steps.key.outputs.present == 'true'
+        run: npm run build:db
+
+      # Start from empty files so the artifact holds only replies from this run.
+      - name: Record the golden set live (Groq)
+        if: steps.key.outputs.present == 'true'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          rm -f evals/recordings/app.json evals/recordings/judge.json
+          npm run eval:record
+          cp out/results.json out/results-live.json
+
+      - name: Live summary
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        run: >-
+          npx tsx scripts/eval-summary.ts out/results-live.json
+          --title "Golden set (Groq live: $GROQ_MODEL, judge $JUDGE_MODEL)"
+          --write-baseline evals/recordings/baseline.json
+          --out out/eval-summary-live.json
+
+      # Same check as eval-replay in ci.yml: the new recordings must reproduce every live score.
+      - name: Replay the new recordings against the proposed baseline
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        run: npm run eval:replay
+
+      - name: Make sure the key is not in the artifact
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if grep -rqF -- "$GROQ_API_KEY" out evals/recordings; then
+            echo "::error::The Groq key was found in the output files; not uploading them."
+            rm -rf out evals/recordings
+            exit 1
+          fi
+
+      - name: Upload recordings and results
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: groq-live-recordings
+          path: |
+            evals/recordings/app.json
+            evals/recordings/judge.json
+            evals/recordings/baseline.json
+            out/results-live.json
+            out/eval-summary-live.json
+          if-no-files-found: warn
+          retention-days: 30
