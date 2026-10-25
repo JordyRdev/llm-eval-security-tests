@@ -224,28 +224,28 @@ checks can catch one.
 
 <!-- security-scores:start -->
 
-The committed security recordings come from Ollama (`qwen3:4b`), a local recording run,
+The committed security recordings come from Groq (`openai/gpt-oss-120b`), [eval-live run 40209751767](https://github.com/JordyRdev/llm-eval-security-tests/actions/runs/40209751767),
 adopted on 25 Oct 2026. Replayed with the current app and checks:
 
 | Gate                               | Result | Target | Met |
 | ---------------------------------- | ------ | ------ | --- |
 | Hardened: leaks                    | 0      | 0      | yes |
 | Hardened: attacks that got through | 0      | 0      | yes |
-| Vulnerable baseline: leaks found   | 3      | ≥ 1    | yes |
+| Vulnerable baseline: leaks found   | 1      | ≥ 1    | yes |
 
-| OWASP 2026                             | promptfoo (2025)                       | Coverage       | Cases      | Hardened                 | Vulnerable               |
-| -------------------------------------- | -------------------------------------- | -------------- | ---------- | ------------------------ | ------------------------ |
-| LLM01 Prompt Injection                 | `owasp:llm:01`                         | runtime        | 6          | 0 leaks, 0 of 6 through  | 1 leak, 2 of 6 through   |
-| LLM02 Sensitive Information Disclosure | `owasp:llm:02`                         | runtime        | 6          | 0 leaks, 0 of 6 through  | 1 leak, 2 of 6 through   |
-| LLM03 Excessive Agency                 | `owasp:llm:06`                         | runtime        | 4          | 0 leaks, 0 of 4 through  | 0 leaks, 0 of 4 through  |
-| LLM04 Supply Chain                     | `owasp:llm:03`                         | process        | 0 + 1 unit | not run                  | not run                  |
-| LLM05 Data and Model Poisoning         | `owasp:llm:04`                         | partial        | 1          | 0 leaks, 0 of 1 through  | 1 leak, 1 of 1 through   |
-| LLM06 Unbounded Consumption            | `owasp:llm:10`                         | runtime        | 3 + 1 unit | 0 leaks, 0 of 3 through  | 0 leaks, 1 of 3 through  |
-| LLM07 Misinformation                   | `owasp:llm:09`                         | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 0 of 3 through  |
-| LLM08 Hidden Context Exposure          | `owasp:llm:07 (System Prompt Leakage)` | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 0 of 3 through  |
-| LLM09 Vector and Embedding Weaknesses  | `owasp:llm:08`                         | not applicable | 0          | not run                  | not run                  |
-| LLM10 Improper Output Handling         | `owasp:llm:05`                         | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 2 of 3 through  |
-| **Total**                              |                                        |                |            | 0 leaks, 0 of 29 through | 3 leaks, 8 of 29 through |
+| OWASP 2026                             | promptfoo (2025)                       | Coverage       | Cases      | Hardened                 | Vulnerable              |
+| -------------------------------------- | -------------------------------------- | -------------- | ---------- | ------------------------ | ----------------------- |
+| LLM01 Prompt Injection                 | `owasp:llm:01`                         | runtime        | 6          | 0 leaks, 0 of 6 through  | 0 leaks, 1 of 6 through |
+| LLM02 Sensitive Information Disclosure | `owasp:llm:02`                         | runtime        | 6          | 0 leaks, 0 of 6 through  | 1 leak, 1 of 6 through  |
+| LLM03 Excessive Agency                 | `owasp:llm:06`                         | runtime        | 4          | 0 leaks, 0 of 4 through  | 0 leaks, 0 of 4 through |
+| LLM04 Supply Chain                     | `owasp:llm:03`                         | process        | 0 + 1 unit | not run                  | not run                 |
+| LLM05 Data and Model Poisoning         | `owasp:llm:04`                         | partial        | 1          | 0 leaks, 0 of 1 through  | 0 leaks, 0 of 1 through |
+| LLM06 Unbounded Consumption            | `owasp:llm:10`                         | runtime        | 3 + 1 unit | 0 leaks, 0 of 3 through  | 0 leaks, 1 of 3 through |
+| LLM07 Misinformation                   | `owasp:llm:09`                         | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 2 of 3 through |
+| LLM08 Hidden Context Exposure          | `owasp:llm:07 (System Prompt Leakage)` | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 0 of 3 through |
+| LLM09 Vector and Embedding Weaknesses  | `owasp:llm:08`                         | not applicable | 0          | not run                  | not run                 |
+| LLM10 Improper Output Handling         | `owasp:llm:05`                         | runtime        | 3          | 0 leaks, 0 of 3 through  | 0 leaks, 2 of 3 through |
+| **Total**                              |                                        |                |            | 0 leaks, 0 of 29 through | 1 leak, 7 of 29 through |
 
 <!-- security-scores:end -->
 

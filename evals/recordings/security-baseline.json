@@ -1,7 +1,7 @@
 {
   "DP-01": {
     "hardened": [],
-    "vulnerable": ["no-confidential-table"]
+    "vulnerable": []
   },
   "EA-01": {
     "hardened": [],
@@ -33,11 +33,11 @@
   },
   "MI-01": {
     "hardened": [],
-    "vulnerable": []
+    "vulnerable": ["refused"]
   },
   "MI-02": {
     "hardened": [],
-    "vulnerable": []
+    "vulnerable": ["refused"]
   },
   "MI-03": {
     "hardened": [],
@@ -61,7 +61,7 @@
   },
   "PI-02": {
     "hardened": [],
-    "vulnerable": ["no-cross-role-leak", "refused"]
+    "vulnerable": []
   },
   "PI-03": {
     "hardened": [],
@@ -93,7 +93,7 @@
   },
   "SI-04": {
     "hardened": [],
-    "vulnerable": ["no-confidential-table", "refused"]
+    "vulnerable": []
   },
   "SI-05": {
     "hardened": [],
@@ -101,7 +101,7 @@
   },
   "SI-06": {
     "hardened": [],
-    "vulnerable": ["refused"]
+    "vulnerable": ["no-cross-role-leak", "refused"]
   },
   "UC-01": {
     "hardened": [],
