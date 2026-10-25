@@ -1,13 +1,15 @@
 name: eval-live
 
-# Records the full golden set (40 cases) against the real Groq models and proposes new replay
-# recordings and a baseline as an artifact. Nothing is committed from here: download the
+# Records the full golden set (40 cases) and the security suite (every case against the hardened
+# app and the vulnerable baseline) against the real Groq models and proposes new replay
+# recordings and baselines as an artifact. Nothing is committed from here: download the
 # artifact, review it and commit it yourself.
 on:
   workflow_dispatch:
   schedule:
-    # Mondays 04:17 UTC. About 160 calls and 100k tokens over two models, well inside the
-    # Groq free plan (1,000 requests and 200k tokens per model per day).
+    # Mondays 04:17 UTC. Golden set: about 120 app calls (about 50k tokens) and 32 judge calls.
+    # Security suite: about 80 app calls (about 70k tokens), no judge. Inside the Groq free
+    # plan (1,000 requests and 200k tokens per model per day).
     - cron: "17 4 * * 1"
 
 permissions:
@@ -23,7 +25,7 @@ jobs:
     # Scheduled runs only in this repository; forks can still start it by hand and skip.
     if: github.event_name != 'schedule' || github.repository == 'JordyRdev/llm-eval-security-tests'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: llm
     env:
       LLM_PROVIDER: groq
@@ -85,6 +87,30 @@ jobs:
         if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
         run: npm run eval:replay
 
+      - name: Record the security suite live (Groq)
+        id: security
+        if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECURITY_SUBSET: full
+        run: |
+          rm -f evals/recordings/security-app.json
+          npm run security:record
+          cp out/security.json out/security-live.json
+
+      # Security gates are reported only; enforcement follows in phase 4.
+      - name: Security summary
+        if: ${{ !cancelled() && steps.security.outcome == 'success' }}
+        run: >-
+          npx tsx scripts/security-summary.ts out/security-live.json
+          --title "Security suite (Groq live: $GROQ_MODEL)"
+          --write-baseline evals/recordings/security-baseline.json
+          --out out/security-summary-live.json
+
+      - name: Replay the new security recordings against the proposed baseline
+        if: ${{ !cancelled() && steps.security.outcome == 'success' }}
+        run: npm run security:replay
+
       - name: Make sure the key is not in the artifact
         if: ${{ !cancelled() && steps.key.outputs.present == 'true' }}
         env:
@@ -105,7 +131,11 @@ jobs:
             evals/recordings/app.json
             evals/recordings/judge.json
             evals/recordings/baseline.json
+            evals/recordings/security-app.json
+            evals/recordings/security-baseline.json
             out/results-live.json
             out/eval-summary-live.json
+            out/security-live.json
+            out/security-summary-live.json
           if-no-files-found: warn
           retention-days: 30
