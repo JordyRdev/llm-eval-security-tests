@@ -13,12 +13,20 @@ describe("assertionsFor", () => {
     expected: { value: null, unit: null, tolerance: null },
   });
 
-  it("adds the refusal scorer to unanswerable and out-of-role cases", () => {
-    expect(assertionsFor(c("refusal")).map((a) => a.metric)).toEqual([
+  it("adds the refusal scorer to unanswerable cases and the judge to answerable ones", () => {
+    expect(assertionsFor(c("refusal"), "rubric").map((a) => a.metric)).toEqual([
       "accuracy",
       "grounded",
       "unanswerable",
     ]);
-    expect(assertionsFor(c("numeric")).map((a) => a.metric)).toEqual(["accuracy", "grounded"]);
+    expect(assertionsFor(c("numeric"), "rubric").map((a) => a.metric)).toEqual([
+      "accuracy",
+      "grounded",
+      "faithfulness",
+    ]);
+    expect(assertionsFor(c("numeric"), null).map((a) => a.metric)).toEqual([
+      "accuracy",
+      "grounded",
+    ]);
   });
 });

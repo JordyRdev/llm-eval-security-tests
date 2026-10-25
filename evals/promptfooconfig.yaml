@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
-description: Ask-your-data golden set (accuracy, made-up content, refusals)
+description: Ask-your-data golden set (accuracy, made-up content, refusals, faithfulness)
 
 # Paths are relative to this file. The question goes to the app as is; the role comes from
 # the test vars.
@@ -9,6 +9,12 @@ prompts:
 providers:
   - id: file://providers/app-provider.ts
     label: ask-your-data
+
+defaultTest:
+  options:
+    # Judge for llm-rubric; JUDGE_PROVIDER picks groq, ollama or replay (fork-safe).
+    provider: file://providers/judge-provider.ts
+    rubricPrompt: file://judge/faithfulness.md
 
 tests: file://golden/tests.ts
 
