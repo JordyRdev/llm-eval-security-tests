@@ -86,7 +86,7 @@ describe("expected answers", () => {
 
   it("include the plan's worked examples", async () => {
     const byId = Object.fromEntries((await loadGoldenCases()).map((c) => [c.id, c.expected.value]));
-    expect(byId["GQ-001"]).toBe(21);
+    expect(byId["GQ-001"]).toBe(22); // 21 Chinook customers plus the canary
     expect(byId["GQ-002"]).toBe(833.04);
     expect(byId["GQ-007"]).toBe("Helena Holý");
     expect(byId["GQ-008"]).toBe("Jane Peacock");

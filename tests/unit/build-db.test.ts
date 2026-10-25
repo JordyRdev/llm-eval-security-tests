@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { MASK, ROLES, type Role } from "../../src/auth/roles.ts";
+import { loadCanaries } from "../../src/data/canaries.ts";
 import { roleDbPath, vulnerableDbPath } from "../../src/db/paths.ts";
 
 const dir = inject("dbDir");
@@ -35,9 +36,10 @@ afterAll(() => {
 
 describe("per-role databases", () => {
   it.each([
-    ["agent_jane", 3, 21, 833.04],
-    ["agent_margaret", 4, 20, 775.4],
-    ["agent_steve", 5, 18, 720.16],
+    // Chinook customers plus one canary customer each.
+    ["agent_jane", 3, 22, 833.04],
+    ["agent_margaret", 4, 21, 775.4],
+    ["agent_steve", 5, 19, 720.16],
   ] as const)("%s only contains customers of SupportRepId %i", (role, rep, customers, revenue) => {
     expect(value(role, "SELECT COUNT(*) FROM Customer")).toBe(customers);
     expect(
@@ -93,7 +95,7 @@ describe("per-role databases", () => {
   });
 
   it("masks customer and employee PII for the sales manager", () => {
-    expect(value("sales_manager", "SELECT COUNT(*) FROM Customer")).toBe(59);
+    expect(value("sales_manager", "SELECT COUNT(*) FROM Customer")).toBe(62);
     for (const column of ["Email", "Phone", "Fax", "Address", "PostalCode"]) {
       expect(
         value("sales_manager", `SELECT COUNT(*) FROM Customer WHERE ${column} IS NOT '${MASK}'`),
@@ -106,9 +108,53 @@ describe("per-role databases", () => {
   });
 
   it("keeps full data and the confidential table only in the vulnerable database", () => {
-    expect(value("vulnerable", "SELECT COUNT(*) FROM Customer")).toBe(59);
-    expect(value("vulnerable", "SELECT COUNT(*) FROM Customer WHERE Email LIKE '%@%'")).toBe(59);
+    expect(value("vulnerable", "SELECT COUNT(*) FROM Customer")).toBe(62);
+    expect(value("vulnerable", "SELECT COUNT(*) FROM Customer WHERE Email LIKE '%@%'")).toBe(62);
     expect(tables("vulnerable")).toContain("employee_comp");
     expect(value("vulnerable", "SELECT COUNT(*) FROM employee_comp")).toBe(8);
+  });
+});
+
+describe("canaries", () => {
+  const canaries = loadCanaries().customers;
+
+  it("gives every agent exactly its own canary customer, without invoices", () => {
+    for (const canary of canaries) {
+      for (const role of ["agent_jane", "agent_margaret", "agent_steve"] as const) {
+        const count = value(role, `SELECT COUNT(*) FROM Customer WHERE Email = '${canary.Email}'`);
+        expect(count, `${canary.Email} in ${role}`).toBe(role === canary.role ? 1 : 0);
+      }
+      expect(
+        value(
+          "vulnerable",
+          `SELECT COUNT(*) FROM Invoice WHERE CustomerId = ${String(canary.CustomerId)}`,
+        ),
+      ).toBe(0);
+    }
+  });
+
+  it("masks the canary e-mails for the sales manager", () => {
+    expect(
+      value("sales_manager", "SELECT COUNT(*) FROM Customer WHERE Email LIKE 'canary-%'"),
+    ).toBe(0);
+    expect(
+      value("sales_manager", "SELECT COUNT(*) FROM Customer WHERE Company = 'Canary Test Account'"),
+    ).toBe(3);
+  });
+
+  it("puts the payload notes only in the database of the customer's agent", () => {
+    const payload = "SELECT COUNT(*) FROM customer_notes WHERE note_text LIKE '%INJECTED-PI04%'";
+    expect(value("agent_jane", payload)).toBe(1);
+    expect(value("agent_margaret", payload)).toBe(0);
+    expect(value("agent_steve", payload)).toBe(0);
+  });
+
+  it("keeps the canary salaries in the vulnerable database only", () => {
+    expect(
+      value(
+        "vulnerable",
+        "SELECT COUNT(*) FROM employee_comp WHERE ReviewNote LIKE 'COMP-CANARY-%'",
+      ),
+    ).toBe(8);
   });
 });

@@ -21,7 +21,7 @@ afterAll(() => {
 describe("QueryRunner", () => {
   it("returns rows as objects with column names", async () => {
     const result = await runner.run(guarded("SELECT COUNT(*) AS customers FROM Customer"));
-    expect(result.rows).toEqual([{ customers: 21 }]);
+    expect(result.rows).toEqual([{ customers: 22 }]);
     expect(result.columns).toEqual(["customers"]);
     expect(result.truncated).toBe(false);
   });

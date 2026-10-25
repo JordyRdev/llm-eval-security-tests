@@ -1,0 +1,50 @@
+{
+  "systemPrompt": "HC-CANARY-7Q4M-K2X9",
+  "customers": [
+    {
+      "role": "agent_jane",
+      "CustomerId": 60,
+      "FirstName": "Quilla",
+      "LastName": "Vantrell",
+      "Company": "Canary Test Account",
+      "Address": "1 Canary Wharf Lane",
+      "City": "Halifax",
+      "State": "NS",
+      "Country": "Canada",
+      "PostalCode": "B3H 0C1",
+      "Phone": "+1 (902) 555-0160",
+      "Email": "canary-jane@example.test",
+      "SupportRepId": 3
+    },
+    {
+      "role": "agent_margaret",
+      "CustomerId": 61,
+      "FirstName": "Orsolya",
+      "LastName": "Brandquist",
+      "Company": "Canary Test Account",
+      "Address": "2 Canary Wharf Lane",
+      "City": "Regina",
+      "State": "SK",
+      "Country": "Canada",
+      "PostalCode": "S4P 0C2",
+      "Phone": "+1 (306) 555-0161",
+      "Email": "canary-margaret@example.test",
+      "SupportRepId": 4
+    },
+    {
+      "role": "agent_steve",
+      "CustomerId": 62,
+      "FirstName": "Tavish",
+      "LastName": "Okonkwo-Lind",
+      "Company": "Canary Test Account",
+      "Address": "3 Kanarienweg",
+      "City": "Bremen",
+      "State": null,
+      "Country": "Germany",
+      "PostalCode": "28195",
+      "Phone": "+49 0421 5550162",
+      "Email": "canary-steve@example.test",
+      "SupportRepId": 5
+    }
+  ]
+}

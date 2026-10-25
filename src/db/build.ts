@@ -9,6 +9,7 @@ import {
   ROLES,
   type Role,
 } from "../auth/roles.ts";
+import { parseCanaries, type CanaryCustomer } from "../data/canaries.ts";
 import { verifyChecksums } from "../data/checksum.ts";
 import { parseCsv } from "./csv.ts";
 import { RAW_DIR, SYNTHETIC_DIR, roleDbPath, vulnerableDbPath } from "./paths.ts";
@@ -34,6 +35,7 @@ export interface BuildManifest {
 }
 
 interface SyntheticData {
+  readonly canaries: readonly CanaryCustomer[];
   readonly notes: { note_id: number; CustomerId: number; note_text: string }[];
   readonly comp: {
     EmployeeId: number;
@@ -59,7 +61,8 @@ async function loadSynthetic(dir: string): Promise<SyntheticData> {
     Currency: r["Currency"] ?? "",
     ReviewNote: r["ReviewNote"] ?? "",
   }));
-  return { notes, comp };
+  const canaries = parseCanaries(await readFile(path.join(dir, "canaries.json"), "utf8")).customers;
+  return { canaries, notes, comp };
 }
 
 function toInt(value: string | undefined, field: string): number {
@@ -80,6 +83,17 @@ function copyDatabase(source: string, target: string): Database.Database {
   // Agents' databases drop `Employee`, which `Customer.SupportRepId` still references.
   db.pragma("foreign_keys = OFF");
   return db;
+}
+
+/** Adds one canary customer per agent (no invoices), before the rows are split per role. */
+function addCanaryCustomers(db: Database.Database, canaries: SyntheticData["canaries"]): void {
+  const insert = db.prepare(
+    `INSERT INTO Customer (CustomerId, FirstName, LastName, Company, Address, City, State, Country, PostalCode, Phone, Fax, Email, SupportRepId)
+     VALUES (@CustomerId, @FirstName, @LastName, @Company, @Address, @City, @State, @Country, @PostalCode, @Phone, NULL, @Email, @SupportRepId)`,
+  );
+  for (const customer of canaries) {
+    insert.run(Object.fromEntries(Object.entries(customer).filter(([key]) => key !== "role")));
+  }
 }
 
 function addCustomerNotes(db: Database.Database, notes: SyntheticData["notes"]): void {
@@ -175,6 +189,7 @@ export async function buildDatabases(options: BuildOptions): Promise<BuildManife
     const db = copyDatabase(sourcePath, file);
     const definition = ROLE_DEFINITIONS[role];
     db.transaction(() => {
+      addCanaryCustomers(db, synthetic.canaries);
       if (definition.employeeId !== undefined) restrictToAgent(db, definition.employeeId);
       else maskForManager(db);
       addCustomerNotes(db, synthetic.notes);
@@ -187,6 +202,7 @@ export async function buildDatabases(options: BuildOptions): Promise<BuildManife
   await rm(file, { force: true });
   const db = copyDatabase(sourcePath, file);
   db.transaction(() => {
+    addCanaryCustomers(db, synthetic.canaries);
     addCustomerNotes(db, synthetic.notes);
     addEmployeeComp(db, synthetic.comp);
   })();

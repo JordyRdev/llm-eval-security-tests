@@ -54,7 +54,7 @@ describe("HTTP API", () => {
   it("answers a question", async () => {
     const scripted = new ScriptedProvider([
       sql("SELECT COUNT(*) AS n FROM Customer"),
-      answer("You have 18 customers.", 18, "customers"),
+      answer("You have 19 customers.", 19, "customers"),
     ]);
     const local = new ChatEngine({ provider: scripted, dbDir: inject("dbDir") });
     try {
@@ -65,9 +65,9 @@ describe("HTTP API", () => {
       });
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
-        value: 18,
+        value: 19,
         refused: false,
-        rows_used: [{ n: 18 }],
+        rows_used: [{ n: 19 }],
       });
     } finally {
       local.close();
