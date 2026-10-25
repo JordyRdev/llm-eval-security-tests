@@ -64,9 +64,11 @@ export default class AppProvider {
 
   private getEngine(): Promise<ChatEngine> {
     const replayFile = this.config.replayFile ?? process.env["REPLAY_FILE"] ?? DEFAULTS.replayFile;
-    this.engine ??= sharedModel(replayFile).then(
-      (provider) => new ChatEngine({ provider, mode: this.mode }),
-    );
+    this.engine ??= sharedModel(replayFile).then((provider) => {
+      // Read DB_DIR per engine; the module-level default is fixed at import time.
+      const dbDir = process.env["DB_DIR"];
+      return new ChatEngine({ provider, mode: this.mode, ...(dbDir ? { dbDir } : {}) });
+    });
     return this.engine;
   }
 
