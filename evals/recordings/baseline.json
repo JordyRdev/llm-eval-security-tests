@@ -25,9 +25,9 @@
     "faithfulness": 1
   },
   "GQ-006": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0
   },
   "GQ-007": {
     "accuracy": 1,
@@ -35,13 +35,13 @@
     "faithfulness": 1
   },
   "GQ-008": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0
   },
   "GQ-009": {
     "accuracy": 1,
-    "grounded": 1,
+    "grounded": 0,
     "faithfulness": 1
   },
   "GQ-010": {
@@ -50,9 +50,9 @@
     "unanswerable": 1
   },
   "GQ-011": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "unanswerable": 1
+    "unanswerable": 0
   },
   "GQ-012": {
     "accuracy": 1,
@@ -102,7 +102,7 @@
   "GQ-021": {
     "accuracy": 1,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0.5
   },
   "GQ-022": {
     "accuracy": 1,
@@ -125,9 +125,9 @@
     "faithfulness": 1
   },
   "GQ-026": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0
   },
   "GQ-027": {
     "accuracy": 1,
@@ -136,13 +136,13 @@
   },
   "GQ-028": {
     "accuracy": 1,
-    "grounded": 1,
+    "grounded": 0,
     "faithfulness": 1
   },
   "GQ-029": {
     "accuracy": 1,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0.5
   },
   "GQ-030": {
     "accuracy": 1,
@@ -161,18 +161,18 @@
   },
   "GQ-033": {
     "accuracy": 1,
-    "grounded": 1,
-    "faithfulness": 1
+    "grounded": 0,
+    "faithfulness": 0.5
   },
   "GQ-034": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0
   },
   "GQ-035": {
-    "accuracy": 1,
+    "accuracy": 0,
     "grounded": 1,
-    "faithfulness": 1
+    "faithfulness": 0
   },
   "GQ-036": {
     "accuracy": 1,
