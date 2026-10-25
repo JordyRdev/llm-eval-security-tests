@@ -20,8 +20,8 @@ database, and, more importantly, the test suite around it:
 - **CI/CD quality gates** in GitHub Actions: deterministic checks on every PR, a real LLM on
   `main` and nightly, and a public report on GitHub Pages.
 
-> **Status:** work in progress. Phase 0 (foundation) and Phase 1 (the app) are done. The evals
-> and security suite are being built in the phases listed in the roadmap below.
+> **Status:** work in progress. Phase 0 (foundation), Phase 1 (the app) and Phase 2 (the evals)
+> are done. The security suite and the LLM gates follow in the phases listed in the roadmap below.
 
 ## Roles
 
@@ -96,10 +96,59 @@ All providers use the OpenAI-compatible chat API with temperature 0 and JSON mod
 | -------------- | ---------------------------- | ----------------------------------------------------------- |
 | `groq`         | `openai/gpt-oss-120b`        | Needs `GROQ_API_KEY`; client-side limiter for the free plan |
 | `ollama`       | `qwen3:4b`                   | Local fallback, no key; default when no Groq key is set     |
-| `replay`       | recorded replies (`evals/…`) | Deterministic, no network; used by the evals in Phase 2     |
+| `replay`       | recorded replies (`evals/…`) | Deterministic, no network; used by `eval-replay` in CI      |
 
 The Groq limiter keeps requests within 30 RPM, 8K TPM, 1K RPD and 200K TPD, runs one request at
 a time and retries 429 and 5xx responses with backoff.
+
+## Evals
+
+The golden set is 40 hand-written questions in `evals/golden/questions.yaml`: 26 numeric, 6
+categorical, 4 that the data cannot answer and 4 outside the asking role. Each question has a
+reference SQL query; `npm run build:golden` builds fresh role databases from the pinned file,
+runs every query and writes the expected answers to `evals/golden/expected.json`. A model never
+decides what is correct. The build fails when a categorical question has no unique winner or when
+the reference for an unanswerable question finds data; CI checks that `expected.json` is up to
+date.
+
+[promptfoo](https://www.promptfoo.dev) (0.125.1, pinned) runs the questions through the real
+pipeline (`evals/providers/app-provider.ts`) and scores each reply with our own deterministic
+scorers in `evals/scorers/`, plus one model-graded check:
+
+| Metric                       | How                                                                                | Target PR (12) | Target nightly (40) |
+| ---------------------------- | ---------------------------------------------------------------------------------- | -------------- | ------------------- |
+| Accuracy                     | `value` within the tolerance (0 for counts, 0.01 for money) or the same name       | ≥ 11 of 12     | ≥ 90 %              |
+| Made-up content              | every number in `answer` must be in `rows_used` (rounding allowed) or the question | 0              | ≤ 2 %               |
+| Unanswerable and out-of-role | `refused: true`, no `value` and no invented number                                 | 100 %          | ≥ 95 %              |
+| Faithfulness (judge)         | `llm-rubric` with `evals/judge/faithfulness.md`, score 0–1                         | —              | mean ≥ 0.85         |
+
+The judge is a different model than the app: `qwen/qwen3.8-27b` on Groq, or `llama3.2:3b` on
+Ollama (`JUDGE_PROVIDER`, `JUDGE_MODEL`). Targets are reported in the job summary for now and
+become a gate in Phase 4.
+
+Subsets (`EVAL_SUBSET`): `full` is all 40, `pr` is GQ-001 to GQ-012 (the Groq PR gate in
+Phase 4), `fork` is 8 cases (6 answerable, 2 refusals) for the keyless Ollama run.
+
+### Replay
+
+`npm run eval:record` saves every app reply and judge verdict to `evals/recordings/app.json` and
+`judge.json`. `npm run eval:replay` replays them without a model or a key, so it runs in forks;
+it fails on a missing recording and when any per-case score differs from
+`evals/recordings/baseline.json`. Changing a prompt, the schema or a question changes the request
+hash, so the recordings must be made again.
+
+The committed recordings come from Ollama (`qwen3:4b` for the app, `llama3.2:3b` as judge) on a
+CPU, not from Groq. Their scores show what a 4B model does, not the targets:
+
+| Metric (40 cases, replay)    | Result                                                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Accuracy                     | 33 of 40 (82.5 %)                                                                                                                        |
+| Made-up content              | 2 of 40 (5.0 %): a garbled year, and a date range taken from the SQL                                                                     |
+| Unanswerable and out-of-role | 4 of 8 (50 %): "streams" answered from purchases, a 100 % profit margin, and "0" instead of a refusal for another agent's data (no leak) |
+| Faithfulness (judge)         | mean 0.75 over 32; the 3B judge also marks correct answers as unfaithful                                                                 |
+
+With `qwen3:4b` as its own judge the mean is 1.00 on the same replies, which is why the judge is
+a different model family. Re-record with Groq once a key is available.
 
 ## Getting started
 
@@ -118,19 +167,28 @@ ollama pull qwen3:4b
 cp .env.example .env # LLM_PROVIDER=ollama
 npm start            # http://127.0.0.1:3000
 npm run smoke        # five questions through the real pipeline, with timings
+npm run eval         # golden set through the real pipeline (EVAL_SUBSET=fork for 8 cases)
+npm run eval:summary # metrics and per-case table from out/results.json
 ```
+
+The local judge needs `ollama pull llama3.2:3b`; `EVAL_JUDGE=0` skips it.
 
 With a Groq key, set `LLM_PROVIDER=groq` and `GROQ_API_KEY` in `.env` instead.
 
-| Script                | What it does                                                    |
-| --------------------- | --------------------------------------------------------------- |
-| `npm run lint`        | ESLint (typescript-eslint, strict type-checked) and Prettier    |
-| `npm run typecheck`   | `tsc --noEmit` in strict mode, for the server and the browser   |
-| `npm test`            | Vitest unit tests (no network, scripted model replies)          |
-| `npm run verify:data` | Verifies the pinned dataset against `data/raw/SHA256SUMS`       |
-| `npm run build:db`    | Builds the per-role and vulnerable databases into `data/build/` |
-| `npm start`           | Starts the chat API and UI                                      |
-| `npm run smoke`       | Asks five questions through the real pipeline and times them    |
+| Script                 | What it does                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `npm run lint`         | ESLint (typescript-eslint, strict type-checked) and Prettier                      |
+| `npm run typecheck`    | `tsc --noEmit` in strict mode, for the server and the browser                     |
+| `npm test`             | Vitest unit tests (no network, scripted model replies)                            |
+| `npm run verify:data`  | Verifies the pinned dataset against `data/raw/SHA256SUMS`                         |
+| `npm run build:db`     | Builds the per-role and vulnerable databases into `data/build/`                   |
+| `npm start`            | Starts the chat API and UI                                                        |
+| `npm run smoke`        | Asks five questions through the real pipeline and times them                      |
+| `npm run build:golden` | Computes `evals/golden/expected.json` with the reference SQL (`-- --check` in CI) |
+| `npm run eval`         | Runs the golden set with promptfoo into `out/results.json`                        |
+| `npm run eval:summary` | Prints the metrics and writes them to the GitHub job summary                      |
+| `npm run eval:record`  | Runs the eval live and saves the replies for replay                               |
+| `npm run eval:replay`  | Replays the recordings and compares the scores with the baseline                  |
 
 No API keys are needed for the checks above. All settings are documented in `.env.example`.
 
@@ -140,17 +198,17 @@ No API keys are needed for the checks above. All settings are documented in `.en
 
 ## CI
 
-| Workflow | Trigger                       | Jobs                                                                        | Secrets |
-| -------- | ----------------------------- | --------------------------------------------------------------------------- | ------- |
-| `ci.yml` | pull requests, push to `main` | `lint-typecheck`, `unit` (checksum, build:db, Vitest), `ollama-smoke` (CPU) | none    |
+| Workflow | Trigger                       | Jobs                                                                                                     | Secrets |
+| -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| `ci.yml` | pull requests, push to `main` | `lint-typecheck`, `unit` (checksum, build:db, golden check, Vitest), `eval-replay`, `ollama-smoke` (CPU) | none    |
 
-`ollama-smoke` runs the real pipeline against `qwen3:4b` on the hosted runner and writes the
-answers and timings to the job summary. It fails only when the pipeline breaks, not on
-accuracy; accuracy is gated by the evals in Phase 2.
-
-Measured on the first green run (25 Oct 2026): `qwen3:4b` on the hosted runner took 22.8 s per
-question on average and 33.0 s at most, with 0 pipeline errors and about 4 minutes for the
-whole run.
+- `eval-replay` runs all 40 golden cases with the recorded replies and judge verdicts in a few
+  seconds and fails on errors, replay misses or a score that differs from the baseline.
+- `ollama-smoke` runs the 8-case `fork` subset live against `qwen3:4b` on the hosted runner,
+  without a judge, and reports accuracy against the 60 % target. It fails only when the pipeline
+  breaks. On the first green run (25 Oct 2026, the Phase 1 five-question smoke) the runner took
+  22.8 s per question on average and 33.0 s at most, with 0 pipeline errors and about 4 minutes
+  for the whole job; the 8 cases add about 3 minutes.
 
 Actions are pinned to commit SHAs and the workflow runs with `contents: read` only.
 
@@ -159,7 +217,7 @@ Actions are pinned to commit SHAs and the workflow runs with `contents: read` on
 - [x] **Phase 0, foundation:** TypeScript project, lint, typecheck, CI, pinned dataset, NOTICE
 - [x] **Phase 1, app:** per-role read-only databases, SELECT-only SQL guard, LLM providers
       (Groq, Ollama, replay), chat API and minimal UI, hardened and vulnerable modes
-- [ ] **Phase 2, evals:** golden questions with SQL-computed answers, accuracy and grounding
+- [x] **Phase 2, evals:** golden questions with SQL-computed answers, accuracy and grounding
       scorers, judge rubric, deterministic replay
 - [ ] **Phase 3, security:** curated cases per OWASP 2026 ID, canary data, red-team config,
       vulnerable-mode baseline
