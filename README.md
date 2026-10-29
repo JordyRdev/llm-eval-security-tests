@@ -21,6 +21,9 @@ database, and, more importantly, the test suite around it:
 - **CI/CD quality gates** in GitHub Actions: deterministic checks on every PR, a real LLM on
   `main` and nightly, and a public report on GitHub Pages.
 
+<img width="1381" height="430" alt="Nightly LLM evaluation on Groq: accuracy 40/40, 0% made-up content, faithfulness 1.00 against a 0.85 target" src="https://github.com/user-attachments/assets/4d861d0b-99ff-4b61-9c80-82118e84ff93" />
+Measured on every run on main and nightly by eval-live.yml. A deterministic replay suite (19 files, 256 tests) runs on every pull request.
+
 > **Status:** work in progress. Phase 0 (foundation), Phase 1 (the app), Phase 2 (the evals) and
 > Phase 3 (the security suite) are done. The enforced LLM gates follow in Phase 4 (see the roadmap
 > below).
