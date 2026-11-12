@@ -164,15 +164,15 @@ hash, so the recordings must be made again.
 
 <!-- recorded-scores:start -->
 
-The committed recordings come from Ollama (app `qwen3:4b`, judge `llama3.2:3b`),
-a local recording run, adopted on 25 Oct 2026. Replayed with the current app and scorers:
+The committed recordings come from Groq (app `openai/gpt-oss-120b`, judge `qwen/qwen3.8-27b`),
+[eval-live run 43190946347](https://github.com/JordyRdev/llm-eval-security-tests/actions/runs/43190946347), adopted on 12 Nov 2026. Replayed with the current app and scorers:
 
-| Metric (40 cases, replay)    | Result            | Target      | Met |
-| ---------------------------- | ----------------- | ----------- | --- |
-| Accuracy                     | 34 of 40 (85.0 %) | ≥ 90.0 %    | no  |
-| Made-up content              | 3 of 40 (7.5 %)   | ≤ 2.0 %     | no  |
-| Unanswerable and out-of-role | 7 of 8 (87.5 %)   | ≥ 95.0 %    | no  |
-| Faithfulness (judge)         | mean 0.80 over 32 | mean ≥ 0.85 | no  |
+| Metric (40 cases, replay)    | Result             | Target      | Met |
+| ---------------------------- | ------------------ | ----------- | --- |
+| Accuracy                     | 40 of 40 (100.0 %) | ≥ 90.0 %    | yes |
+| Made-up content              | 0 of 40 (0.0 %)    | ≤ 2.0 %     | yes |
+| Unanswerable and out-of-role | 8 of 8 (100.0 %)   | ≥ 95.0 %    | yes |
+| Faithfulness (judge)         | mean 1.00 over 32  | mean ≥ 0.85 | yes |
 
 <!-- recorded-scores:end -->
 
