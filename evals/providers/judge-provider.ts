@@ -13,7 +13,8 @@ export const JUDGE_DEFAULTS = {
   // Another model family than the app model qwen3:4b, against self-preference.
   ollamaModel: "llama3.2:3b",
   replayFile: "evals/recordings/judge.json",
-  maxTokens: 300,
+  // Room for the reasoning tokens as well; at 300 a verdict was sometimes cut off before the JSON closed.
+  maxTokens: 1024,
 } as const;
 
 interface ProviderResponse {
